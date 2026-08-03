@@ -18,8 +18,10 @@ dependencies = [
     "uvicorn>=0.52.1",
 ]
 
-[project.scripts]
-backend = "backend:main"
+[tool.uv]
+
+[tool.uv.scripts]
+dev = "uvicorn app.main:app --reload"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
