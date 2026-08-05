@@ -1,34 +1,50 @@
-# import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-# from pydantic import ValidationError
 
-from app.core.config import settings
-from app.core.logging import configure_logging, get_logger
-from app.core.exceptions import APIException
-from app.schemas.response import ErrorResponse
 from app.api.router import router
+from app.cache.redis import connect_redis, disconnect_redis
+from app.core.config import settings
+from app.core.exceptions import APIException
+from app.core.logging import configure_logging, get_logger
+from app.db.init_db import init_db
+from app.db.session import close_db_engine
+from app.schemas.response import ErrorResponse
 
+# Configure logging before acquiring logger instances
+configure_logging()
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifecycle manager."""
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-    yield
-    logger.info(f"Shutting down {settings.app_name}")
 
+    try:
+        await init_db()
+        await connect_redis()
 
+        yield
+
+    finally:
+        try:
+            await disconnect_redis()
+        except Exception:
+            logger.exception("Redis shutdown failed")
+
+        try:
+            await close_db_engine()
+        except Exception:
+            logger.exception("Database engine shutdown failed")
+
+        logger.info(f"Shutting down {settings.app_name}")
+        
+        
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
-    configure_logging()
-    logger = get_logger(__name__)
-
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -67,7 +83,7 @@ def create_app() -> FastAPI:
         request: Request, exc: RequestValidationError
     ):
         """Handle Pydantic validation errors from request bodies."""
-        errors: list[dict[str, str]] = []        
+        errors: list[dict[str, str]] = []
         for error in exc.errors():
             field = ".".join(str(x) for x in error["loc"][1:])
             errors.append(

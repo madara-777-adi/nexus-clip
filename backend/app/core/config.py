@@ -1,15 +1,16 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application configuration from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-    )
+    env_file=".env",
+    env_file_encoding="utf-8",
+    case_sensitive=False,
+    extra="ignore",
+)
 
     # Application
     app_name: str = Field(default="Nexus Clip", description="Application name")
@@ -32,6 +33,25 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", description="Logging level")
     log_format: str = Field(
         default="json", description="Log format (json or text)"
+    )
+
+    # Database
+    database_url: str = Field(
+        description="PostgreSQL async database URL (e.g., postgresql+psycopg://user:password@localhost:5432/nexus_clip)",
+    )
+
+    # Cache
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis connection URL",
+    )
+    redis_enabled: bool = Field(
+        default=True,
+        description="Enable Redis caching",
+    )
+    cache_default_ttl: int = Field(
+        default=3600,
+        description="Default cache TTL in seconds",
     )
 
     @property
