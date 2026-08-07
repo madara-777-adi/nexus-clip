@@ -7,22 +7,13 @@ from app.models.clip import ClipStatus, Platform
 
 
 class CreateClipRequest(BaseModel):
-    """Request payload for creating a new clip."""
+    """Request payload for creating a clip."""
 
-    title: str = Field(
-        ...,
-        min_length=1,
-        max_length=255,
-        examples=["Introduction to FastAPI"],
-    )
     original_url: HttpUrl
-    platform: Platform
-    thumbnail_url: HttpUrl | None = None
-    duration_seconds: int | None = Field(default=None, ge=0)
 
 
 class UpdateClipRequest(BaseModel):
-    """Request payload for updating clip metadata."""
+    """Request payload for updating editable clip metadata."""
 
     title: str | None = Field(
         default=None,
@@ -30,8 +21,6 @@ class UpdateClipRequest(BaseModel):
         max_length=255,
         examples=["Updated Clip Title"],
     )
-    thumbnail_url: HttpUrl | None = None
-    duration_seconds: int | None = Field(default=None, ge=0)
 
 
 class ClipResponse(BaseModel):
@@ -44,6 +33,7 @@ class ClipResponse(BaseModel):
     platform: Platform
     thumbnail_url: str | None = None
     duration_seconds: int | None = None
+    uploader: str | None = None
     status: ClipStatus
     created_at: datetime
     updated_at: datetime

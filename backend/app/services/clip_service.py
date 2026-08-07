@@ -3,8 +3,10 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError, NotFoundError
-from app.models.clip import Clip, ClipStatus, Platform
+from app.models.clip import Clip, ClipStatus
+from app.models.user import User
 from app.repositories.clip_repository import ClipRepository
+from app.services.metadata_service import MetadataService
 
 
 class ClipService:
@@ -13,104 +15,134 @@ class ClipService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.repository = ClipRepository(db)
+        self.metadata_service = MetadataService()
 
     async def create_clip(
         self,
-        title: str,
         original_url: str,
-        platform: Platform,
-        thumbnail_url: str | None = None,
-        duration_seconds: int | None = None,
+        owner: User,
     ) -> Clip:
-        """Create a new clip after validating URL uniqueness."""
-        existing_clip = await self.repository.get_by_original_url(original_url)
-        if existing_clip is not None:
-            raise ConflictError(f"Clip with URL '{original_url}' already exists.")
+        """Create a new clip after extracting metadata."""
 
-        clip = Clip(
-            title=title,
-            original_url=original_url,
-            platform=platform,
-            thumbnail_url=thumbnail_url,
-            duration_seconds=duration_seconds,
+        normalized_url = self.metadata_service.normalize_url(
+            original_url
         )
 
-        try:
-            created_clip = await self.repository.create(clip)
-            await self.db.commit()
-            await self.db.refresh(created_clip)
-            return created_clip
-        except Exception:
-            await self.db.rollback()
-            raise
+        platform = self.metadata_service.detect_platform(
+            normalized_url
+        )
 
-    async def get_clip(self, clip_id: uuid.UUID) -> Clip:
-        """Retrieve a clip by ID or raise NotFoundError."""
-        clip = await self.repository.get_by_id(clip_id)
+        existing_clip = await self.repository.get_by_original_url(
+            owner_id=owner.id,
+            original_url=normalized_url,
+        )
+
+        if existing_clip is not None:
+            raise ConflictError(
+                f"Clip with URL '{normalized_url}' already exists."
+            )
+
+        metadata = await self.metadata_service.fetch_metadata(
+            normalized_url
+        )
+
+        clip = Clip(
+            title=metadata.title,
+            original_url=normalized_url,
+            platform=platform,
+            thumbnail_url=metadata.thumbnail_url,
+            duration_seconds=metadata.duration_seconds,
+            uploader=metadata.uploader,
+            status=ClipStatus.COMPLETED,
+            owner_id=owner.id,
+        )
+
+        created_clip = await self.repository.create(clip)
+
+        await self.db.commit()
+        await self.db.refresh(created_clip)
+
+        return created_clip
+
+    async def get_clip(
+        self,
+        clip_id: uuid.UUID,
+        owner: User,
+    ) -> Clip:
+        clip = await self.repository.get_by_id(
+            clip_id=clip_id,
+            owner_id=owner.id,
+        )
+
         if clip is None:
-            raise NotFoundError(f"Clip with ID '{clip_id}' not found.")
+            raise NotFoundError(
+                f"Clip with ID '{clip_id}' not found."
+            )
+
         return clip
 
     async def list_clips(
         self,
+        owner: User,
         offset: int = 0,
         limit: int = 20,
     ) -> list[Clip]:
-        """Retrieve a paginated list of clips."""
-        return await self.repository.list(offset=offset, limit=limit)
+        return await self.repository.list(
+            owner_id=owner.id,
+            offset=offset,
+            limit=limit,
+        )
 
     async def update_clip(
         self,
         clip_id: uuid.UUID,
+        owner: User,
         title: str | None = None,
-        thumbnail_url: str | None = None,
-        duration_seconds: int | None = None,
     ) -> Clip:
-        """Update optional metadata fields of a clip."""
-        clip = await self.get_clip(clip_id)
+        clip = await self.get_clip(
+            clip_id=clip_id,
+            owner=owner,
+        )
 
         if title is not None:
             clip.title = title
 
-        if thumbnail_url is not None:
-            clip.thumbnail_url = thumbnail_url
+        await self.db.flush()
+        await self.db.commit()
+        await self.db.refresh(clip)
 
-        if duration_seconds is not None:
-            clip.duration_seconds = duration_seconds
-
-        try:
-            await self.db.flush()
-            await self.db.commit()
-            await self.db.refresh(clip)
-            return clip
-        except Exception:
-            await self.db.rollback()
-            raise
+        return clip
 
     async def update_clip_status(
         self,
         clip_id: uuid.UUID,
+        owner: User,
         status: ClipStatus,
     ) -> Clip:
-        """Update the processing status of a clip."""
-        clip = await self.get_clip(clip_id)
+        clip = await self.get_clip(
+            clip_id=clip_id,
+            owner=owner,
+        )
 
-        try:
-            updated_clip = await self.repository.update_status(clip, status)
-            await self.db.commit()
-            await self.db.refresh(updated_clip)
-            return updated_clip
-        except Exception:
-            await self.db.rollback()
-            raise
+        updated = await self.repository.update_status(
+            clip,
+            status,
+        )
 
-    async def delete_clip(self, clip_id: uuid.UUID) -> None:
-        """Delete a clip by ID or raise NotFoundError."""
-        clip = await self.get_clip(clip_id)
+        await self.db.commit()
+        await self.db.refresh(updated)
 
-        try:
-            await self.repository.delete(clip)
-            await self.db.commit()
-        except Exception:
-            await self.db.rollback()
-            raise
+        return updated
+
+    async def delete_clip(
+        self,
+        clip_id: uuid.UUID,
+        owner: User,
+    ) -> None:
+        clip = await self.get_clip(
+            clip_id=clip_id,
+            owner=owner,
+        )
+
+        await self.repository.delete(clip)
+        await self.db.commit()
