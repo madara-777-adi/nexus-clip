@@ -1,8 +1,7 @@
-import logging
 import json
+import logging
 import sys
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from app.core.config import settings
 
@@ -12,7 +11,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_data = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -34,7 +33,7 @@ class TextFormatter(logging.Formatter):
     """Format logs as plain text."""
 
     def format(self, record: logging.LogRecord) -> str:
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
         return (
             f"{timestamp} [{record.levelname:8}] {record.name}: {record.getMessage()}"
         )

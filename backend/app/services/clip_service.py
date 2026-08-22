@@ -2,11 +2,11 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ConflictError, NotFoundError
-from app.models.clip import Clip, ClipStatus
+from app.core.exceptions import NotFoundError
+from app.models.clip import Clip, ClipType
 from app.models.user import User
+from app.repositories.board_repository import BoardRepository
 from app.repositories.clip_repository import ClipRepository
-from app.services.metadata_service import MetadataService
 
 
 class ClipService:
@@ -14,81 +14,67 @@ class ClipService:
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
-        self.repository = ClipRepository(db)
-        self.metadata_service = MetadataService()
+        self.clip_repository = ClipRepository(db)
+        self.board_repository = BoardRepository(db)
 
     async def create_clip(
         self,
-        original_url: str,
-        owner: User,
+        user: User,
+        board_id: uuid.UUID,
+        clip_type: ClipType = ClipType.TEXT,
+        title: str = "Untitled Clip",
+        content: str | None = None,
+        file_url: str | None = None,
+        file_name: str | None = None,
+        file_size: int | None = None,
+        tags: list[str] | None = None,
+        is_pinned: bool = False,
     ) -> Clip:
-        """Create a new clip after extracting metadata."""
-
-        normalized_url = self.metadata_service.normalize_url(
-            original_url
-        )
-
-        platform = self.metadata_service.detect_platform(
-            normalized_url
-        )
-
-        existing_clip = await self.repository.get_by_original_url(
-            owner_id=owner.id,
-            original_url=normalized_url,
-        )
-
-        if existing_clip is not None:
-            raise ConflictError(
-                f"Clip with URL '{normalized_url}' already exists."
-            )
-
-        metadata = await self.metadata_service.fetch_metadata(
-            normalized_url
-        )
+        """Create a clip inside a user board."""
+        # Verify board ownership
+        board = await self.board_repository.get_by_id(board_id, user.id)
+        if board is None:
+            raise NotFoundError(f"Board with ID '{board_id}' not found.")
 
         clip = Clip(
-            title=metadata.title,
-            original_url=normalized_url,
-            platform=platform,
-            thumbnail_url=metadata.thumbnail_url,
-            duration_seconds=metadata.duration_seconds,
-            uploader=metadata.uploader,
-            status=ClipStatus.COMPLETED,
-            owner_id=owner.id,
+            board_id=board.id,
+            user_id=user.id,
+            type=clip_type,
+            title=title or "Untitled Clip",
+            content=content,
+            file_url=file_url,
+            file_name=file_name,
+            file_size=file_size,
+            tags=tags or [],
+            is_pinned=is_pinned,
         )
 
-        created_clip = await self.repository.create(clip)
-
+        created = await self.clip_repository.create(clip)
         await self.db.commit()
-        await self.db.refresh(created_clip)
+        await self.db.refresh(created)
+        return created
 
-        return created_clip
-
-    async def get_clip(
-        self,
-        clip_id: uuid.UUID,
-        owner: User,
-    ) -> Clip:
-        clip = await self.repository.get_by_id(
-            clip_id=clip_id,
-            owner_id=owner.id,
-        )
-
+    async def get_clip(self, clip_id: uuid.UUID, user: User) -> Clip:
+        """Get clip by ID for authenticated user."""
+        clip = await self.clip_repository.get_by_id(clip_id, user.id)
         if clip is None:
-            raise NotFoundError(
-                f"Clip with ID '{clip_id}' not found."
-            )
-
+            raise NotFoundError(f"Clip with ID '{clip_id}' not found.")
         return clip
 
-    async def list_clips(
+    async def list_board_clips(
         self,
-        owner: User,
+        board_id: uuid.UUID,
+        user: User,
         offset: int = 0,
-        limit: int = 20,
-    ) -> list[Clip]:
-        return await self.repository.list(
-            owner_id=owner.id,
+        limit: int = 50,
+    ) -> tuple[list[Clip], int]:
+        """List clips for a board."""
+        board = await self.board_repository.get_by_id(board_id, user.id)
+        if board is None:
+            raise NotFoundError(f"Board with ID '{board_id}' not found.")
+        return await self.clip_repository.list_by_board(
+            board_id=board_id,
+            user_id=user.id,
             offset=offset,
             limit=limit,
         )
@@ -96,53 +82,40 @@ class ClipService:
     async def update_clip(
         self,
         clip_id: uuid.UUID,
-        owner: User,
+        user: User,
         title: str | None = None,
+        content: str | None = None,
+        tags: list[str] | None = None,
+        is_pinned: bool | None = None,
     ) -> Clip:
-        clip = await self.get_clip(
-            clip_id=clip_id,
-            owner=owner,
-        )
+        """Update clip fields."""
+        clip = await self.get_clip(clip_id, user)
 
         if title is not None:
             clip.title = title
+        if content is not None:
+            clip.content = content
+        if tags is not None:
+            clip.tags = tags
+        if is_pinned is not None:
+            clip.is_pinned = is_pinned
 
         await self.db.flush()
         await self.db.commit()
         await self.db.refresh(clip)
-
         return clip
 
-    async def update_clip_status(
-        self,
-        clip_id: uuid.UUID,
-        owner: User,
-        status: ClipStatus,
-    ) -> Clip:
-        clip = await self.get_clip(
-            clip_id=clip_id,
-            owner=owner,
-        )
-
-        updated = await self.repository.update_status(
-            clip,
-            status,
-        )
-
+    async def toggle_pin(self, clip_id: uuid.UUID, user: User) -> Clip:
+        """Toggle pin state of clip."""
+        clip = await self.get_clip(clip_id, user)
+        clip.is_pinned = not clip.is_pinned
+        await self.db.flush()
         await self.db.commit()
-        await self.db.refresh(updated)
+        await self.db.refresh(clip)
+        return clip
 
-        return updated
-
-    async def delete_clip(
-        self,
-        clip_id: uuid.UUID,
-        owner: User,
-    ) -> None:
-        clip = await self.get_clip(
-            clip_id=clip_id,
-            owner=owner,
-        )
-
-        await self.repository.delete(clip)
+    async def delete_clip(self, clip_id: uuid.UUID, user: User) -> None:
+        """Delete clip."""
+        clip = await self.get_clip(clip_id, user)
+        await self.clip_repository.delete(clip)
         await self.db.commit()

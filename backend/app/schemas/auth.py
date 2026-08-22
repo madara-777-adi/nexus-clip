@@ -1,23 +1,32 @@
 import uuid
-from typing import Literal
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+
+class UserRegisterRequest(BaseModel):
+    """Request schema for user registration."""
+
+    name: str = Field(..., min_length=2, max_length=255)
+    email: EmailStr
+    password: str = Field(..., min_length=6, max_length=128)
+
+
+class UserLoginRequest(BaseModel):
+    """Request schema for email/password login."""
+
+    email: EmailStr
+    password: str
 
 
 class GoogleLoginRequest(BaseModel):
-    """Request payload for Google OAuth authentication."""
+    """Request schema for Google OAuth authentication."""
 
-    id_token: str
-
-
-class TokenResponse(BaseModel):
-    """Response payload containing backend JWT access token."""
-
-    access_token: str
-    token_type: Literal["Bearer"] = "Bearer"
+    id_token: str = Field(..., min_length=1)
 
 
-class AuthenticatedUserResponse(BaseModel):
-    """Public response payload for an authenticated user."""
+class UserProfileResponse(BaseModel):
+    """Public profile response payload for a user."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,3 +34,12 @@ class AuthenticatedUserResponse(BaseModel):
     email: str
     full_name: str
     avatar_url: str | None = None
+    created_at: datetime
+
+
+class TokenResponse(BaseModel):
+    """Authentication token response payload."""
+
+    access_token: str
+    token_type: str = "bearer"
+    user: UserProfileResponse

@@ -1,22 +1,27 @@
+import mimetypes
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.api.router import router
 from app.cache.redis import connect_redis, disconnect_redis
 from app.core.config import settings
 from app.core.exceptions import APIException
 from app.core.logging import configure_logging, get_logger
-from app.db.init_db import init_db
+from app.db.init_db import create_tables, init_db
 from app.db.session import close_db_engine
 from app.schemas.response import ErrorResponse
 
 # Configure logging before acquiring logger instances
 configure_logging()
 logger = get_logger(__name__)
+
+UPLOAD_DIR = Path("/tmp/nexus_uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -25,6 +30,7 @@ async def lifespan(app: FastAPI):
 
     try:
         await init_db()
+        await create_tables()
         await connect_redis()
 
         yield
@@ -41,8 +47,8 @@ async def lifespan(app: FastAPI):
             logger.exception("Database engine shutdown failed")
 
         logger.info(f"Shutting down {settings.app_name}")
-        
-        
+
+
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
     app = FastAPI(
@@ -55,11 +61,30 @@ def create_app() -> FastAPI:
     # CORS Middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=["*"],  # Allow origins for local dev/testing
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Serve uploaded files as forced downloads to prevent inline script execution.
+    # Content-Disposition: attachment is set on every response regardless of file type,
+    # so an uploaded .html/.svg can never run as a script in this origin.
+    @app.get("/static/uploads/{filename}")
+    async def serve_upload(filename: str) -> FileResponse:
+        """Force-download any uploaded file — never render inline."""
+        file_path = UPLOAD_DIR / filename
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(status_code=404, detail="File not found")
+        # Resolve the media type so the browser picks the right icon/app,
+        # but the attachment disposition still prevents inline rendering.
+        media_type, _ = mimetypes.guess_type(str(file_path))
+        return FileResponse(
+            path=str(file_path),
+            media_type=media_type or "application/octet-stream",
+            filename=filename,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
     # Exception Handlers
     @app.exception_handler(APIException)
@@ -85,12 +110,12 @@ def create_app() -> FastAPI:
         """Handle Pydantic validation errors from request bodies."""
         errors: list[dict[str, str]] = []
         for error in exc.errors():
-            field = ".".join(str(x) for x in error["loc"][1:])
+            field = ".".join(str(x) for x in error.get("loc", [])[1:])
             errors.append(
                 {
                     "field": field or "unknown",
-                    "detail": error["msg"],
-                    "type": error["type"],
+                    "detail": str(error.get("msg")),
+                    "type": str(error.get("type")),
                 }
             )
 
@@ -108,9 +133,9 @@ def create_app() -> FastAPI:
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
         """Handle unexpected exceptions."""
-        logger.error(
-            f"Unexpected exception: {str(exc)}",
-            exc_info=True,
+        logger.exception(
+            "Unexpected exception: %s",
+            exc,
             extra={"path": request.url.path},
         )
 

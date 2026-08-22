@@ -1,5 +1,6 @@
-from datetime import datetime, timedelta, timezone
 import uuid
+from datetime import UTC, datetime, timedelta
+
 import jwt
 
 from app.core.config import settings
@@ -8,7 +9,7 @@ from app.core.exceptions import UnauthorizedError
 
 def create_access_token(user_id: uuid.UUID) -> str:
     """Generate a signed JWT access token for an internal user ID."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + timedelta(minutes=settings.jwt_expire_minutes)
 
     payload = {

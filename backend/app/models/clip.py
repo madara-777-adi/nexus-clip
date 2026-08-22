@@ -3,12 +3,16 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
-    Enum as SQLEnum,
+    JSON,
+    UUID,
+    Boolean,
     ForeignKey,
     Integer,
     String,
-    UUID,
-    UniqueConstraint,
+    Text,
+)
+from sqlalchemy import (
+    Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,99 +20,100 @@ from app.db.base import Base
 from app.models.mixins import TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
+    from app.models.board import Board
     from app.models.user import User
 
 
-class Platform(StrEnum):
-    """Supported clip source platforms."""
+class ClipType(StrEnum):
+    """Supported clip types in Nexus Clip."""
 
-    YOUTUBE = "youtube"
-    INSTAGRAM = "instagram"
-    TWITTER = "twitter"
-    TIKTOK = "tiktok"
-
-
-class ClipStatus(StrEnum):
-    """Lifecycle status states for a clip."""
-
-    PENDING = "PENDING"
-    PROCESSING = "PROCESSING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
+    TEXT = "text"
+    CODE = "code"
+    MARKDOWN = "markdown"
+    IMAGE = "image"
+    FILE = "file"
+    URL = "url"
 
 
 class Clip(Base, UUIDMixin, TimestampMixin):
-    """Domain entity representing a web media clip."""
+    """Domain entity representing a clipboard clip."""
 
     __tablename__ = "clips"
 
-    __table_args__ = (
-        UniqueConstraint(
-            "owner_id",
-            "original_url",
-            name="uq_owner_original_url",
-        ),
-    )
-
-    title: Mapped[str] = mapped_column(
-        String,
-        nullable=False,
-    )
-
-    original_url: Mapped[str] = mapped_column(
-        String,
-        nullable=False,
-    )
-
-    platform: Mapped[Platform] = mapped_column(
-        SQLEnum(
-            Platform,
-            native_enum=True,
-            name="platform_enum",
-        ),
-        nullable=False,
-    )
-
-    thumbnail_url: Mapped[str | None] = mapped_column(
-        String,
+    board_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("boards.id", ondelete="CASCADE"),
+        index=True,
         nullable=True,
         default=None,
     )
 
-    duration_seconds: Mapped[int | None] = mapped_column(
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+        default=None,
+    )
+
+    type: Mapped[ClipType] = mapped_column(
+        SQLEnum(
+            ClipType,
+            native_enum=False,
+            name="clip_type_enum",
+        ),
+        nullable=False,
+        default=ClipType.TEXT,
+    )
+
+    title: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        default="Untitled Clip",
+    )
+
+    content: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        default=None,
+    )
+
+    file_url: Mapped[str | None] = mapped_column(
+        String(2048),
+        nullable=True,
+        default=None,
+    )
+
+    file_name: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        default=None,
+    )
+
+    file_size: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         default=None,
     )
 
-    uploader: Mapped[str | None] = mapped_column(
-        String,
+    tags: Mapped[list[str] | None] = mapped_column(
+        JSON,
         nullable=True,
-        default=None,
+        default=list,
     )
 
-    status: Mapped[ClipStatus] = mapped_column(
-        SQLEnum(
-            ClipStatus,
-            native_enum=True,
-            name="clip_status_enum",
-        ),
-        nullable=False,
-        default=ClipStatus.PENDING,
-        server_default=ClipStatus.PENDING.value,
-    )
-
-    owner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey(
-            "users.id",
-            ondelete="CASCADE",
-        ),
-        index=True,
+    is_pinned: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
         nullable=False,
     )
 
-    owner: Mapped["User"] = relationship(
+    board: Mapped["Board | None"] = relationship(
+        "Board",
+        back_populates="clips",
+    )
+
+    user: Mapped["User | None"] = relationship(
         "User",
         back_populates="clips",
     )

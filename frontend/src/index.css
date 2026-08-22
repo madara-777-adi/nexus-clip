@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@import "@fontsource/baloo-2/600.css";
+@import "@fontsource/baloo-2/700.css";
+@import "@fontsource/nunito/400.css";
+@import "@fontsource/nunito/500.css";
+@import "@fontsource/nunito/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+@theme {
+  --font-display: "Baloo 2", system-ui, sans-serif;
+  --font-body: "Nunito", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-bg: #2B2E3D;
+  --color-clay: #343850;
+  --color-clay-hi: #3E4360;
+  --color-ink: #F1EFFB;
+  --color-muted: #9AA0C2;
+
+  --color-mint: #8FE3C0;
+  --color-sky: #8FC7F2;
+  --color-lav: #C9B3F5;
+  --color-sun: #FFD98E;
+  --color-coral: #F5A3B0;
+}
+
+:root {
+  --bg: #2B2E3D;
+  --clay: #343850;
+  --clay-hi: #3E4360;
+  --ink: #F1EFFB;
+  --muted: #9AA0C2;
+
+  --mint: #8FE3C0;
+  --sky: #8FC7F2;
+  --lav: #C9B3F5;
+  --sun: #FFD98E;
+  --coral: #F5A3B0;
+
+  --shadow-dark: 10px 10px 22px rgba(0, 0, 0, 0.45);
+  --shadow-light: -8px -8px 18px rgba(255, 255, 255, 0.035);
+  --shadow-press-dark: inset 6px 6px 12px rgba(0, 0, 0, 0.5);
+  --shadow-press-light: inset -5px -5px 10px rgba(255, 255, 255, 0.03);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+@layer components {
+  .clay-raised {
+    background: linear-gradient(145deg, var(--clay-hi), var(--clay));
+    box-shadow: var(--shadow-dark), var(--shadow-light);
+  }
+  .clay-pressed {
+    background: linear-gradient(145deg, var(--bg), var(--clay-hi));
+    box-shadow: var(--shadow-press-dark), var(--shadow-press-light);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--clay-hi);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}

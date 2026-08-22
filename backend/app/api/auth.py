@@ -1,9 +1,15 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
+from app.api.dependencies import get_current_user
 from app.db.session import get_db
-from app.schemas.auth import GoogleLoginRequest, TokenResponse
+from app.models.user import User
+from app.schemas.auth import (
+    TokenResponse,
+    UserLoginRequest,
+    UserProfileResponse,
+    UserRegisterRequest,
+)
 from app.schemas.response import APIResponse
 from app.services.auth_service import AuthService
 
@@ -14,42 +20,85 @@ router = APIRouter(
 
 
 @router.post(
-    "/google",
+    "/register",
+    response_model=APIResponse[TokenResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def register(
+    request: UserRegisterRequest,
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[TokenResponse]:
+    """Register a new user account."""
+    service = AuthService(db)
+    user, token = await service.register_user(
+        name=request.name,
+        email=request.email,
+        password=request.password,
+    )
+    profile = UserProfileResponse.model_validate(user)
+    return APIResponse(
+        success=True,
+        message="Account registered successfully.",
+        data=TokenResponse(
+            access_token=token,
+            user=profile,
+        ),
+    )
+
+
+@router.post(
+    "/login",
     response_model=APIResponse[TokenResponse],
     status_code=status.HTTP_200_OK,
 )
-async def login_with_google(
-    request: GoogleLoginRequest,
+async def login(
+    request: UserLoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[TokenResponse]:
-    """Authenticate a user using a Google ID Token."""
-
-    google_payload = verify_google_id_token(request.id_token)
-
-    auth_service = AuthService(db)
-
-    user = await auth_service.get_or_create_user(
-        google_id=google_payload.google_id,
-        email=google_payload.email,
-        full_name=google_payload.full_name,
-        avatar_url=google_payload.avatar_url,
+    """Authenticate email/password user."""
+    service = AuthService(db)
+    user, token = await service.login_user(
+        email=request.email,
+        password=request.password,
     )
-
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-
-    await db.refresh(user)
-
-    access_token = create_access_token(user.id)
-
+    profile = UserProfileResponse.model_validate(user)
     return APIResponse(
         success=True,
         message="Authentication successful.",
         data=TokenResponse(
-            access_token=access_token,
-            token_type="Bearer",
+            access_token=token,
+            user=profile,
         ),
+    )
+
+
+@router.post(
+    "/logout",
+    response_model=APIResponse[None],
+    status_code=status.HTTP_200_OK,
+)
+async def logout(
+    current_user: User = Depends(get_current_user),
+) -> APIResponse[None]:
+    """Invalidate active session."""
+    return APIResponse(
+        success=True,
+        message="Logged out successfully.",
+        data=None,
+    )
+
+
+@router.get(
+    "/me",
+    response_model=APIResponse[UserProfileResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_me(
+    current_user: User = Depends(get_current_user),
+) -> APIResponse[UserProfileResponse]:
+    """Get profile of current authenticated user."""
+    return APIResponse(
+        success=True,
+        message="User profile retrieved.",
+        data=UserProfileResponse.model_validate(current_user),
     )

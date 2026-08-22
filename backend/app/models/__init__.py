@@ -1,12 +1,15 @@
-from app.models.clip import Clip, ClipStatus, Platform
+from app.models.board import Board
+from app.models.clip import Clip, ClipType
 from app.models.mixins import TimestampMixin, UUIDMixin
+from app.models.settings import UserSettings
 from app.models.user import User
 
 __all__ = [
+    "Board",
     "Clip",
-    "ClipStatus",
-    "Platform",
+    "ClipType",
     "TimestampMixin",
     "UUIDMixin",
     "User",
+    "UserSettings",
 ]
