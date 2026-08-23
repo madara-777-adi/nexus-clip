@@ -54,14 +54,21 @@ class Settings(BaseSettings):
     # CORS
     # ------------------------------------------------------------------
 
-    cors_origins: list[str] = Field(
-        default=["http://localhost:5173", "http://localhost:3000"],
-        description=(
-            "Allowed CORS origins.  Defaults include Vite (5173) and CRA (3000) "
-            "dev servers.  Production MUST override via CORS_ORIGINS env var with "
-            "the actual frontend domain(s), e.g. '[\"https://nexusclip.app\"]'."
-        ),
-    )
+    cors_origins_raw: str = Field(
+    default="http://localhost:5173,http://localhost:3000",
+    alias="CORS_ORIGINS",
+    description=(
+        "Comma-separated list of allowed CORS origins (no brackets/quotes "
+        "needed).  Defaults to Vite (5173) and CRA (3000) dev servers.  "
+        "Production MUST override via CORS_ORIGINS env var, e.g. "
+        "'https://nexusclip.app,https://www.nexusclip.app'."
+    ),
+)
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Parsed list of allowed origins, trimmed and empty entries dropped."""
+        return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
 
     # ------------------------------------------------------------------
     # Logging
