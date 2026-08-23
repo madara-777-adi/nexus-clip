@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.models.user import User
 from app.schemas.clip import ClipResponse, CreateClipRequest
 from app.schemas.guest import (
@@ -72,12 +73,14 @@ async def create_guest_clip(
     response_model=APIResponse[GuestBoardResponse],
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit("10/minute")
 async def continue_guest_board(
-    request: GuestContinueRequest,
+    request: Request,
+    body: GuestContinueRequest,
 ) -> APIResponse[GuestBoardResponse]:
     """Continue an existing Guest Board across devices using Board Code."""
     service = GuestService()
-    session = await service.continue_guest_board(request.boardCode)
+    session = await service.continue_guest_board(body.boardCode)
     return APIResponse(
         success=True,
         message="Guest Board continued successfully.",

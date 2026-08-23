@@ -39,27 +39,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#030712]/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md clay-raised rounded-[24px] p-8 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
+      <div
+        className="w-full max-w-md bg-card p-8 relative"
+        style={{ border: '4px solid var(--ink)', boxShadow: '10px 10px 0 var(--ink)' }}
+      >
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 w-8 h-8 rounded-xl clay-raised flex items-center justify-center text-muted hover:text-ink transition-colors"
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-ink bg-card hover:bg-pink hover:text-card transition-colors"
+          style={{ border: '3px solid var(--ink)' }}
         >
           <X size={16} />
         </button>
 
         {/* Tab Headers */}
-        <div className="flex gap-4 mb-8">
+        <div className="flex gap-3 mb-8">
           <button
             onClick={() => {
               setIsLoginTab(true);
               setError(null);
             }}
-            className={`flex-1 py-3 text-[13px] font-semibold uppercase tracking-widest rounded-xl transition-all ${
+            className={`flex-1 py-3 text-[13px] font-bold uppercase tracking-widest transition-all ${
               isLoginTab
-                ? 'clay-pressed text-mint'
-                : 'clay-raised text-muted hover:text-ink'
+                ? 'bg-ink text-paper'
+                : 'bg-card text-ink hover:bg-ink/10'
             }`}
+            style={{ border: '3px solid var(--ink)', boxShadow: isLoginTab ? '3px 3px 0 var(--pink)' : 'none' }}
           >
             Sign In
           </button>
@@ -68,18 +73,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               setIsLoginTab(false);
               setError(null);
             }}
-            className={`flex-1 py-3 text-[13px] font-semibold uppercase tracking-widest rounded-xl transition-all ${
+            className={`flex-1 py-3 text-[13px] font-bold uppercase tracking-widest transition-all ${
               !isLoginTab
-                ? 'clay-pressed text-mint'
-                : 'clay-raised text-muted hover:text-ink'
+                ? 'bg-ink text-paper'
+                : 'bg-card text-ink hover:bg-ink/10'
             }`}
+            style={{ border: '3px solid var(--ink)', boxShadow: !isLoginTab ? '3px 3px 0 var(--pink)' : 'none' }}
           >
             Register
           </button>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl clay-pressed border border-coral/20 text-coral text-sm">
+          <div
+            className="mb-6 p-4 text-pink text-sm font-bold bg-pink/10"
+            style={{ border: '3px solid var(--pink)' }}
+          >
             {error}
           </div>
         )}
@@ -87,7 +96,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <form onSubmit={handleSubmit} className="space-y-5">
           {!isLoginTab && (
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">
+              <label className="block text-[11px] font-bold uppercase tracking-widest text-ink mb-2">
                 Full Name
               </label>
               <input
@@ -96,13 +105,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 placeholder="Jane Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-transparent clay-pressed text-ink px-4 py-3 rounded-xl text-sm focus:outline-none placeholder:text-muted/60"
+                className="neo-input"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-ink mb-2">
               Email Address
             </label>
             <input
@@ -111,12 +120,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-transparent clay-pressed text-ink px-4 py-3 rounded-xl text-sm focus:outline-none placeholder:text-muted/60"
+              className="neo-input"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-ink mb-2">
               Password
             </label>
             <input
@@ -125,14 +134,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-transparent clay-pressed text-ink px-4 py-3 rounded-xl text-sm focus:outline-none placeholder:text-muted/60"
+              className="neo-input"
             />
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full mt-4 py-3.5 rounded-xl clay-raised text-mint font-semibold uppercase tracking-widest text-sm hover:brightness-110 transition-all disabled:opacity-50"
+            className="neo-btn w-full mt-4 py-3.5"
           >
             {isSubmitting
               ? 'Processing...'

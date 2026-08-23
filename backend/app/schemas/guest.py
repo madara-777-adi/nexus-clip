@@ -20,7 +20,7 @@ class GuestBoardResponse(BaseModel):
 class GuestContinueRequest(BaseModel):
     """Request payload for continuing a guest board via Board Code."""
 
-    boardCode: str = Field(..., min_length=4, max_length=20, examples=["NEXUS-A1B2"])
+    boardCode: str = Field(..., min_length=10, max_length=20, examples=["NEXUS-A1B2C3D4"])
 
 
 class GuestPromoteResponse(BaseModel):

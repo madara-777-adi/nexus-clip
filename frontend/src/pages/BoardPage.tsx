@@ -43,16 +43,19 @@ export const BoardPage: React.FC = () => {
       <div className="flex-1 flex flex-col relative h-screen overflow-hidden">
         <Topbar onOpenAuth={() => setIsAuthOpen(true)} />
         
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 md:p-10 scrollbar-thin">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 md:p-10">
           <div className="max-w-7xl mx-auto h-full flex flex-col">
             
             {/* Board Header */}
             <div className="flex items-start justify-between mb-8">
               <div>
-                <h1 className="font-display text-[27px] font-bold text-ink leading-tight">
+                <h1
+                  className="font-display text-[44px] font-bold text-ink leading-tight inline-block"
+                  style={{ transform: 'rotate(-1deg)' }}
+                >
                   {isGuestMode ? "Guest Board" : (activeBoard?.name || "Loading...")}
                 </h1>
-                <p className="text-[11px] font-mono text-muted uppercase tracking-widest mt-1">
+                <p className="text-[11px] font-mono text-ink/65 uppercase tracking-widest mt-1">
                   {clips.length} clips · {pinnedCount} pinned · last updated {formatRelativeTime(activeBoard?.updated_at || clips[0]?.created_at)}
                 </p>
               </div>
@@ -60,7 +63,8 @@ export const BoardPage: React.FC = () => {
               {!isGuestMode && (
                 <button
                   onClick={() => setIsSettingsOpen(true)}
-                  className="w-10 h-10 rounded-xl clay-raised flex items-center justify-center text-muted hover:text-ink transition-colors"
+                  className="w-10 h-10 flex items-center justify-center text-ink bg-card border-ink hover:bg-pink hover:text-card transition-colors"
+                  style={{ border: '3px solid var(--ink)', boxShadow: '4px 4px 0 var(--ink)' }}
                 >
                   <Settings size={18} />
                 </button>

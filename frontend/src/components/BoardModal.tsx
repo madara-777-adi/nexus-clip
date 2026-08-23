@@ -31,11 +31,15 @@ export const BoardModal: React.FC<BoardModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#030712]/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md clay-raised rounded-[24px] p-8 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
+      <div
+        className="w-full max-w-md bg-card p-8 relative"
+        style={{ border: '4px solid var(--ink)', boxShadow: '10px 10px 0 var(--ink)' }}
+      >
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 w-8 h-8 rounded-xl clay-raised flex items-center justify-center text-muted hover:text-ink transition-colors"
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-ink bg-card hover:bg-pink hover:text-card transition-colors"
+          style={{ border: '3px solid var(--ink)' }}
         >
           <X size={16} />
         </button>
@@ -44,7 +48,7 @@ export const BoardModal: React.FC<BoardModalProps> = ({ isOpen, onClose }) => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-ink mb-2">
               Board Name
             </label>
             <input
@@ -52,7 +56,7 @@ export const BoardModal: React.FC<BoardModalProps> = ({ isOpen, onClose }) => {
               placeholder="e.g. Project Alpha, Resume Notes..."
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-transparent clay-pressed text-ink px-4 py-3 rounded-xl text-sm focus:outline-none placeholder:text-muted/60"
+              className="neo-input"
               autoFocus
             />
           </div>
@@ -61,14 +65,14 @@ export const BoardModal: React.FC<BoardModalProps> = ({ isOpen, onClose }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-3 clay-pressed text-muted text-xs font-semibold uppercase tracking-widest rounded-xl hover:text-ink transition-colors"
+              className="neo-btn-secondary text-xs py-3 px-5"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !name.trim()}
-              className="px-5 py-3 clay-raised text-mint text-xs font-semibold uppercase tracking-widest rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
+              className="neo-btn text-xs py-3 px-5"
             >
               Create
             </button>

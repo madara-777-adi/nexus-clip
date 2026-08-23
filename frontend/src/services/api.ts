@@ -1,6 +1,6 @@
 import type { APIResponse, Board, Clip, ClipType, GuestSession, User, UserSettings } from '../types';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 class ApiClient {
   private getHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {

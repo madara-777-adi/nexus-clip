@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
+from app.middleware.rate_limit import limiter
 from app.models.user import User
 from app.schemas.auth import (
     TokenResponse,
@@ -51,15 +52,17 @@ async def register(
     response_model=APIResponse[TokenResponse],
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit("5/minute")
 async def login(
-    request: UserLoginRequest,
+    request: Request,
+    body: UserLoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[TokenResponse]:
     """Authenticate email/password user."""
     service = AuthService(db)
     user, token = await service.login_user(
-        email=request.email,
-        password=request.password,
+        email=body.email,
+        password=body.password,
     )
     profile = UserProfileResponse.model_validate(user)
     return APIResponse(

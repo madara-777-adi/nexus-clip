@@ -59,3 +59,64 @@ async def test_file_upload_too_large(client: AsyncClient, monkeypatch):
     assert response.status_code == 413
     data = response.json()
     assert data["success"] is False
+
+
+@pytest.mark.asyncio
+async def test_delete_path_traversal(client: AsyncClient):
+    """Path traversal payload in delete request is caught and silent fails."""
+    import os
+    import tempfile
+    
+    # Create a dummy file outside UPLOAD_DIR
+    fd, dummy_path = tempfile.mkstemp()
+    os.close(fd)
+    try:
+        # Write some data
+        with open(dummy_path, "w") as f:
+            f.write("secret data")
+            
+        # Attempt to delete the file using a path traversal payload
+        # e.g., if UPLOAD_DIR is /tmp/nexus_uploads, the payload tries to go up.
+        # We need a relative path from UPLOAD_DIR to dummy_path
+        from app.services.storage_service import UPLOAD_DIR
+        import os.path
+        rel_path = os.path.relpath(dummy_path, UPLOAD_DIR)
+        
+        # Replace os.sep with / for the URL
+        payload = rel_path.replace(os.sep, "/")
+        
+        # Test the service directly, because the HTTP router (Starlette) will naturally
+        # collapse ../ in URLs, masking the underlying vulnerability in the service.
+        from app.services.storage_service import StorageService
+        service = StorageService()
+        
+        # This shouldn't raise an exception (silent fail)
+        await service.delete_file(f"/static/uploads/{payload}")
+        
+        # ASSERT: The file outside UPLOAD_DIR was NOT deleted
+        assert os.path.exists(dummy_path)
+    finally:
+        if os.path.exists(dummy_path):
+            os.remove(dummy_path)
+
+
+@pytest.mark.asyncio
+async def test_delete_legitimate_file(client: AsyncClient):
+    """Deleting a legitimate file inside UPLOAD_DIR succeeds and removes the file."""
+    import os
+    from app.services.storage_service import UPLOAD_DIR
+    
+    # Create a legitimate file
+    filename = "legit_test_file.txt"
+    file_path = UPLOAD_DIR / filename
+    file_path.write_text("legit content")
+    
+    assert file_path.exists()
+    
+    response = await client.delete(f"/api/v1/upload/{filename}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    
+    # ASSERT: The legitimate file WAS deleted
+    assert not file_path.exists()

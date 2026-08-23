@@ -17,12 +17,15 @@ async def connect_redis() -> None:
 
     logger.info("Connecting to Redis...")
     try:
-        redis_client = Redis.from_url(
-            settings.redis_url,
-            decode_responses=True,
-            socket_timeout=5.0,
-            socket_connect_timeout=5.0,
-        )
+        kwargs = {
+            "decode_responses": True,
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 5.0,
+        }
+        if settings.redis_url.startswith("rediss://"):
+            kwargs["ssl_cert_reqs"] = "none"
+
+        redis_client = Redis.from_url(settings.redis_url, **kwargs)
         await redis_client.ping()
         logger.info("Redis connection established successfully.")
     except RedisError:

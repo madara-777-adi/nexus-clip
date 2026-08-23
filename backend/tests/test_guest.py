@@ -36,6 +36,9 @@ async def test_guest_session_and_clip_flow(client: AsyncClient):
     board_code = session_data["board_code"]
     assert board_code is not None
     assert board_code.startswith("NEXUS-")
+    suffix = board_code.removeprefix("NEXUS-")
+    assert len(suffix) == 8
+    assert suffix.isalnum() and suffix.isupper()
 
     # 4. Continue guest board on another device using board code
     cont_res = await client.post(
@@ -68,3 +71,11 @@ async def test_guest_session_and_clip_flow(client: AsyncClient):
     assert promote_res.status_code == 200
     p_data = promote_res.json()["data"]
     assert p_data["moved_clips_count"] == 1
+
+
+def test_board_code_entropy_uniqueness():
+    """Ensure generating 1000 board codes yields no duplicates (basic sanity check on k=8 entropy)."""
+    from app.services.guest_service import GuestService
+
+    codes = [GuestService.generate_board_code() for _ in range(1000)]
+    assert len(set(codes)) == 1000

@@ -52,6 +52,7 @@ def configure_logging() -> None:
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(settings.log_level)
 
+    formatter: logging.Formatter
     if settings.log_format == "json":
         formatter = JSONFormatter()
     else:

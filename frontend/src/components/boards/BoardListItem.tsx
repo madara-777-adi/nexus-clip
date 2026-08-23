@@ -65,10 +65,11 @@ export const BoardListItem: React.FC<BoardListItemProps> = ({ id, name, isActive
     return (
       <form 
         onSubmit={handleSaveRename}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-2xl clay-pressed"
+        className="w-full flex items-center gap-2 px-3 py-2 bg-card"
+        style={{ border: '3px solid var(--ink)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={clsx("w-2.5 h-2.5 rounded-full shrink-0", colorClass)} />
+        <div className={clsx("w-2.5 h-2.5 shrink-0", colorClass)} />
         <input
           ref={inputRef}
           type="text"
@@ -76,12 +77,12 @@ export const BoardListItem: React.FC<BoardListItemProps> = ({ id, name, isActive
           onChange={(e) => setEditName(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isSubmitting}
-          className="w-full bg-transparent text-sm text-ink outline-none px-1"
+          className="w-full bg-transparent text-sm text-ink outline-none px-1 font-body"
         />
         <button
           type="submit"
           disabled={isSubmitting || !editName.trim()}
-          className="p-1 hover:text-mint text-muted transition-colors shrink-0"
+          className="p-1 hover:text-cyan text-ink transition-colors shrink-0"
           title="Save"
         >
           <Check size={14} />
@@ -92,7 +93,7 @@ export const BoardListItem: React.FC<BoardListItemProps> = ({ id, name, isActive
             setEditName(name);
             setIsEditing(false);
           }}
-          className="p-1 hover:text-coral text-muted transition-colors shrink-0"
+          className="p-1 hover:text-pink text-ink transition-colors shrink-0"
           title="Cancel"
         >
           <X size={14} />
@@ -105,16 +106,16 @@ export const BoardListItem: React.FC<BoardListItemProps> = ({ id, name, isActive
     <div
       onClick={onClick}
       className={clsx(
-        "group w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-medium transition-all text-left cursor-pointer",
+        "group w-full flex items-center justify-between px-4 py-3 text-sm font-bold transition-all text-left cursor-pointer",
         isActive 
-          ? "clay-raised text-ink" 
-          : "text-muted hover:text-ink bg-transparent shadow-none hover:bg-white/[0.02]"
+          ? "bg-card text-ink" 
+          : "text-ink/70 hover:text-ink bg-transparent hover:bg-card/50"
       )}
+      style={isActive ? { border: '3px solid var(--ink)', boxShadow: '4px 4px 0 var(--ink)' } : { border: '3px solid transparent' }}
     >
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <div 
-          className={clsx("w-2.5 h-2.5 rounded-full shrink-0 shadow-sm", colorClass)}
-          style={isActive ? { boxShadow: `0 0 10px var(--${colorClass.split('-')[1]})` } : {}}
+          className={clsx("w-3 h-3 shrink-0", colorClass)}
         />
         <span className="truncate">{name}</span>
       </div>
@@ -125,14 +126,14 @@ export const BoardListItem: React.FC<BoardListItemProps> = ({ id, name, isActive
             e.stopPropagation();
             setIsEditing(true);
           }}
-          className="p-1 text-muted hover:text-ink rounded-lg transition-colors"
+          className="p-1 text-ink/60 hover:text-ink transition-colors"
           title="Rename board"
         >
           <Pencil size={13} />
         </button>
         <button
           onClick={handleDelete}
-          className="p-1 text-muted hover:text-coral rounded-lg transition-colors"
+          className="p-1 text-ink/60 hover:text-pink transition-colors"
           title="Delete board"
         >
           <Trash2 size={13} />

@@ -36,31 +36,40 @@ export const GuestContinueModal: React.FC<GuestContinueModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#030712]/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md clay-raised rounded-[24px] p-8 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
+      <div
+        className="w-full max-w-md bg-card p-8 relative"
+        style={{ border: '4px solid var(--ink)', boxShadow: '10px 10px 0 var(--ink)' }}
+      >
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 w-8 h-8 rounded-xl clay-raised flex items-center justify-center text-muted hover:text-ink transition-colors"
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-ink bg-card hover:bg-pink hover:text-card transition-colors"
+          style={{ border: '3px solid var(--ink)' }}
         >
           <X size={16} />
         </button>
 
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-[14px] clay-pressed flex items-center justify-center text-mint">
+          <div
+            className="w-12 h-12 flex items-center justify-center text-cyan bg-ink"
+          >
             <KeyRound size={20} strokeWidth={2.5} />
           </div>
           <div>
             <h3 className="font-display text-[23px] font-bold text-ink leading-tight">
               Continue Board
             </h3>
-            <p className="text-[11px] font-semibold text-muted uppercase tracking-widest mt-1">
+            <p className="text-[11px] font-bold text-ink/65 uppercase tracking-widest mt-1">
               Enter 6-character code
             </p>
           </div>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl clay-pressed border border-coral/20 text-coral text-sm">
+          <div
+            className="mb-6 p-4 text-pink text-sm font-bold bg-pink/10"
+            style={{ border: '3px solid var(--pink)' }}
+          >
             {error}
           </div>
         )}
@@ -72,7 +81,8 @@ export const GuestContinueModal: React.FC<GuestContinueModalProps> = ({
               placeholder="NEXUS-XXXX"
               value={boardCode}
               onChange={(e) => setBoardCode(e.target.value.toUpperCase())}
-              className="w-full bg-transparent clay-pressed text-ink font-mono tracking-widest text-center px-4 py-4 rounded-xl text-lg focus:outline-none placeholder:text-muted/40 uppercase"
+              className="neo-input font-display tracking-widest text-center text-lg uppercase"
+              style={{ padding: '16px' }}
               autoFocus
             />
           </div>
@@ -81,14 +91,14 @@ export const GuestContinueModal: React.FC<GuestContinueModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-3 clay-pressed text-muted text-xs font-semibold uppercase tracking-widest rounded-xl hover:text-ink transition-colors"
+              className="neo-btn-secondary text-xs py-3 px-5"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !boardCode.trim()}
-              className="px-5 py-3 clay-raised text-mint text-xs font-semibold uppercase tracking-widest rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
+              className="neo-btn text-xs py-3 px-5"
             >
               Sync
             </button>

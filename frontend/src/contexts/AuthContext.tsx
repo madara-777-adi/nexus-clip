@@ -18,19 +18,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    let mounted = true;
     const token = localStorage.getItem('nexus_auth_token');
     if (token) {
       api
         .getMe()
-        .then((u) => setUser(u))
+        .then((u) => {
+          if (mounted) setUser(u);
+        })
         .catch(() => {
           api.logout();
-          setUser(null);
+          if (mounted) setUser(null);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (mounted) setLoading(false);
+        });
     } else {
-      setLoading(false);
+      if (mounted) setLoading(false);
     }
+    return () => { mounted = false; };
   }, []);
 
   const login = async (email: string, pass: string) => {

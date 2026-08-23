@@ -129,10 +129,16 @@ export const Dropzone: React.FC = () => {
       }}
       onDrop={handleDrop}
       className={clsx(
-        "w-full rounded-3xl clay-pressed transition-all duration-200 relative overflow-hidden flex flex-col p-4 mb-8",
-        isDragOver && "shadow-[0_0_0_2px_var(--mint),inset_6px_6px_12px_rgba(0,0,0,.5),inset_-5px_-5px_10px_rgba(255,255,255,.03)]",
+        "w-full transition-all duration-200 relative overflow-hidden flex flex-col p-5 mb-8",
+        isDragOver && "bg-cyan/10",
         isFocused || text.length > 0 ? "min-h-[140px]" : "min-h-[110px]"
       )}
+      style={{
+        border: '4px dashed var(--ink)',
+        background: isDragOver
+          ? undefined
+          : 'repeating-linear-gradient(135deg, var(--card), var(--card) 12px, #f4f4f4 12px, #f4f4f4 24px)',
+      }}
     >
       <input
         type="file"
@@ -143,13 +149,23 @@ export const Dropzone: React.FC = () => {
 
       {isUploading ? (
         <div className="flex-1 flex flex-col items-center justify-center py-6 gap-3">
-          <div className="w-48 h-1.5 rounded-full clay-pressed overflow-hidden relative">
-            <div className="absolute top-0 left-0 h-full bg-mint w-1/2 animate-[progress_1s_ease-in-out_infinite]" />
+          <div className="w-48 h-2 overflow-hidden relative bg-card" style={{ border: '2px solid var(--ink)' }}>
+            <div
+              className="absolute top-0 left-0 h-full bg-cyan w-1/2"
+              style={{ animation: 'progress 1s ease-in-out infinite' }}
+            />
           </div>
-          <span className="text-xs font-semibold text-mint uppercase tracking-widest">Processing...</span>
+          <span className="text-xs font-bold text-ink uppercase tracking-widest">Processing...</span>
         </div>
       ) : (
         <>
+          {/* Header label */}
+          {!isFocused && text.length === 0 && (
+            <div className="text-center font-display text-[18px] text-ink mb-3">
+              DRAG A FILE HERE, OR PASTE WITH ⌘V
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             value={text}
@@ -158,32 +174,34 @@ export const Dropzone: React.FC = () => {
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             placeholder="Type note, paste code/URL, or drag & drop files here..."
-            className="w-full flex-1 bg-transparent text-sm text-ink placeholder:text-muted/60 outline-none resize-none font-mono leading-relaxed"
+            className="w-full flex-1 bg-transparent text-sm text-ink placeholder:text-ink/35 outline-none resize-none font-mono leading-relaxed"
             rows={isFocused || text.length > 0 ? 3 : 2}
           />
 
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.04]">
+          <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '2px solid var(--ink)' }}>
             {/* Type selector & attach button */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 rounded-xl clay-raised text-muted hover:text-ink transition-all text-xs flex items-center gap-1.5"
+                className="py-1.5 px-2.5 text-ink text-xs flex items-center gap-1.5 font-bold transition-all hover:bg-ink hover:text-paper"
+                style={{ border: '2px solid var(--ink)' }}
                 title="Upload file"
               >
                 <Paperclip size={14} />
-                <span className="hidden sm:inline text-[11px] font-semibold uppercase tracking-wider">File</span>
+                <span className="hidden sm:inline text-[11px] font-bold uppercase tracking-wider">File</span>
               </button>
 
-              <div className="h-4 w-[1px] bg-white/[0.06] mx-1" />
+              <div className="h-5 w-[2px] bg-ink mx-1" />
 
               <button
                 type="button"
                 onClick={() => setSelectedType('text')}
                 className={clsx(
-                  "px-2.5 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all flex items-center gap-1",
-                  selectedType === 'text' ? "clay-pressed text-sky" : "clay-raised text-muted hover:text-ink"
+                  "px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-1",
+                  selectedType === 'text' ? "bg-cyan text-ink" : "bg-card text-ink hover:bg-ink/10"
                 )}
+                style={{ border: '2px solid var(--ink)' }}
               >
                 <FileText size={12} />
                 <span>Text</span>
@@ -193,9 +211,10 @@ export const Dropzone: React.FC = () => {
                 type="button"
                 onClick={() => setSelectedType('code')}
                 className={clsx(
-                  "px-2.5 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all flex items-center gap-1",
-                  selectedType === 'code' ? "clay-pressed text-mint" : "clay-raised text-muted hover:text-ink"
+                  "px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-1",
+                  selectedType === 'code' ? "bg-cyan text-ink" : "bg-card text-ink hover:bg-ink/10"
                 )}
+                style={{ border: '2px solid var(--ink)' }}
               >
                 <Code2 size={12} />
                 <span>Code</span>
@@ -205,9 +224,10 @@ export const Dropzone: React.FC = () => {
                 type="button"
                 onClick={() => setSelectedType('url')}
                 className={clsx(
-                  "px-2.5 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all flex items-center gap-1",
-                  selectedType === 'url' ? "clay-pressed text-lav" : "clay-raised text-muted hover:text-ink"
+                  "px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-1",
+                  selectedType === 'url' ? "bg-pink text-ink" : "bg-card text-ink hover:bg-ink/10"
                 )}
+                style={{ border: '2px solid var(--ink)' }}
               >
                 <LinkIcon size={12} />
                 <span>URL</span>
@@ -216,7 +236,7 @@ export const Dropzone: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
-              <span className="hidden sm:inline text-[10px] font-mono text-muted/60">
+              <span className="hidden sm:inline text-[10px] font-mono text-ink/50 font-bold">
                 ⌘+Enter
               </span>
               <button
@@ -224,10 +244,8 @@ export const Dropzone: React.FC = () => {
                 onClick={handleSubmit}
                 disabled={!text.trim()}
                 className={clsx(
-                  "px-4 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-widest flex items-center gap-1.5 transition-all",
-                  text.trim()
-                    ? "clay-raised text-mint hover:brightness-110 cursor-pointer"
-                    : "opacity-40 text-muted cursor-not-allowed"
+                  "neo-btn text-xs py-1.5 px-4",
+                  !text.trim() && "opacity-40 cursor-not-allowed"
                 )}
               >
                 <Send size={12} />
@@ -237,13 +255,6 @@ export const Dropzone: React.FC = () => {
           </div>
         </>
       )}
-
-      <style>{`
-        @keyframes progress {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(200%); }
-        }
-      `}</style>
     </div>
   );
 };

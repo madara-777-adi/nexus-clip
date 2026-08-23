@@ -42,11 +42,15 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-[#030712]/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-bg h-full p-8 shadow-2xl overflow-y-auto relative border-l border-clay-hi/20">
+    <div className="fixed inset-0 z-50 flex justify-end bg-ink/60">
+      <div
+        className="w-full max-w-md bg-paper h-full p-8 overflow-y-auto relative"
+        style={{ borderLeft: '5px solid var(--ink)' }}
+      >
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 w-8 h-8 rounded-xl clay-raised flex items-center justify-center text-muted hover:text-ink transition-colors"
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-ink bg-card hover:bg-pink hover:text-card transition-colors"
+          style={{ border: '3px solid var(--ink)' }}
         >
           <X size={16} />
         </button>
@@ -55,19 +59,25 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
 
         {loading || !settings ? (
           <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 border-2 border-mint border-t-transparent rounded-full animate-spin" />
+            <div
+              className="w-6 h-6 animate-spin"
+              style={{ border: '3px solid var(--ink)', borderTopColor: 'transparent' }}
+            />
           </div>
         ) : (
           <div className="space-y-6">
             {/* Auto Cleanup Section */}
-            <div className="clay-raised rounded-3xl p-6">
+            <div
+              className="bg-card p-6"
+              style={{ border: '4px solid var(--ink)', boxShadow: '6px 6px 0 var(--ink)' }}
+            >
               <div className="flex items-center gap-3 mb-3">
-                <Clock className="w-5 h-5 text-mint" />
+                <Clock className="w-5 h-5 text-cyan" />
                 <h4 className="text-[14px] font-bold text-ink tracking-wide">
                   Auto Cleanup
                 </h4>
               </div>
-              <p className="text-xs text-muted mb-6 leading-relaxed">
+              <p className="text-xs text-ink/65 mb-6 leading-relaxed">
                 Automatically prune unpinned clips older than the selected retention period.
               </p>
 
@@ -76,11 +86,15 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                   <button
                     key={days}
                     onClick={() => handleRetentionChange(days)}
-                    className={`py-3 rounded-[14px] text-[12px] font-semibold uppercase tracking-widest transition-all ${
+                    className={`py-3 text-[12px] font-bold uppercase tracking-widest transition-all ${
                       settings.auto_cleanup_days === days
-                        ? 'clay-pressed text-mint'
-                        : 'clay-raised text-muted hover:text-ink'
+                        ? 'bg-ink text-paper'
+                        : 'bg-card text-ink hover:bg-ink/10'
                     }`}
+                    style={{
+                      border: '3px solid var(--ink)',
+                      boxShadow: settings.auto_cleanup_days === days ? '3px 3px 0 var(--pink)' : 'none',
+                    }}
                   >
                     {days === 'never' ? 'Never' : `${days} Days`}
                   </button>
@@ -89,14 +103,17 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             </div>
 
             {/* Privacy Protection Note */}
-            <div className="clay-pressed rounded-[20px] p-5">
+            <div
+              className="bg-paper p-5"
+              style={{ border: '3px solid var(--ink)' }}
+            >
               <div className="flex items-center gap-2 mb-2">
-                <ShieldCheck className="w-4 h-4 text-sun" />
-                <h4 className="text-xs font-semibold text-sun uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4 text-pink" />
+                <h4 className="text-xs font-bold text-pink uppercase tracking-wider">
                   Protected Clips
                 </h4>
               </div>
-              <p className="text-[11px] text-muted leading-relaxed">
+              <p className="text-[11px] text-ink/65 leading-relaxed">
                 Pinned clips are permanently protected and will never be automatically deleted by background cleanup jobs.
               </p>
             </div>

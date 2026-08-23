@@ -21,6 +21,23 @@ const formatRelativeTime = (isoString: string) => {
   return `${Math.floor(diffInSeconds / 86400)}d ago`;
 };
 
+/** Map clip types to the sample's CSS class equivalents for border-top accent */
+const typeToAccentBorder = (type: string): string => {
+  switch (type) {
+    case 'text':
+    case 'markdown':
+    case 'code':
+      return 'var(--cyan)';
+    case 'url':
+      return 'var(--pink)';
+    case 'image':
+    case 'file':
+      return 'var(--violet)';
+    default:
+      return 'var(--cyan)';
+  }
+};
+
 export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
   const { showToast, deleteClip } = useBoard();
 
@@ -50,7 +67,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
     switch (clip.type) {
       case 'code':
         return (
-          <div className="mt-4 p-4 rounded-xl clay-pressed overflow-x-auto">
+          <div className="mt-4 p-4 overflow-x-auto bg-ink/5" style={{ border: '2px solid var(--ink)' }}>
             <pre className="font-mono text-[12px] text-ink leading-relaxed">
               <code>{clip.content}</code>
             </pre>
@@ -58,7 +75,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
         );
       case 'markdown':
         return (
-          <div className="mt-4 p-4 rounded-xl clay-pressed overflow-x-auto max-h-[300px] overflow-y-auto">
+          <div className="mt-4 p-4 overflow-x-auto max-h-[300px] overflow-y-auto bg-ink/5" style={{ border: '2px solid var(--ink)' }}>
             <pre className="font-mono text-[12px] text-ink whitespace-pre-wrap">
               {clip.content}
             </pre>
@@ -66,11 +83,12 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
         );
       case 'image':
         return (
-          <div className="mt-4 rounded-xl clay-pressed overflow-hidden flex items-center justify-center p-2">
+          <div className="mt-4 overflow-hidden flex items-center justify-center">
             <img 
               src={clip.file_url || ''} 
               alt={clip.title}
-              className="max-h-[300px] object-contain rounded-lg"
+              className="max-h-[300px] w-full object-contain"
+              style={{ border: '3px solid var(--ink)' }}
               loading="lazy"
             />
           </div>
@@ -82,7 +100,8 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
               href={clip.content || '#'} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-lav hover:underline text-sm break-all font-mono"
+              className="text-pink hover:underline text-sm break-all font-mono font-bold"
+              style={{ borderBottom: '2px solid var(--pink)' }}
             >
               {clip.content}
             </a>
@@ -93,8 +112,8 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
       case 'text':
       default:
         return (
-          <div className="mt-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-            <p className="text-[14px] text-ink/90 whitespace-pre-wrap leading-[1.55]">
+          <div className="mt-4 max-h-[300px] overflow-y-auto pr-2">
+            <p className="text-[14px] text-ink whitespace-pre-wrap leading-[1.5]">
               {clip.content}
             </p>
           </div>
@@ -107,9 +126,13 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
   return (
     <div 
       className={clsx(
-        "group p-[18px] pb-4 rounded-[24px] clay-raised flex flex-col transition-transform duration-150 hover:-translate-y-[3px]",
+        "group neo-card p-4 flex flex-col relative",
         isWide && "col-span-1 md:col-span-2"
       )}
+      style={{
+        borderTopColor: typeToAccentBorder(clip.type),
+        borderTopWidth: '6px',
+      }}
     >
       <div className="flex items-center justify-between">
         <ClipTypeChip type={clip.type} />
@@ -117,17 +140,17 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
       </div>
 
       {clip.title && clip.type !== 'text' && clip.type !== 'markdown' && clip.type !== 'code' && (
-        <h3 className="mt-4 font-semibold text-ink text-sm truncate">{clip.title}</h3>
+        <h3 className="mt-4 font-bold text-ink text-sm truncate">{clip.title}</h3>
       )}
       
       {/* For text/markdown/code, the content itself is the primary focus, title is secondary if present */}
       {(clip.type === 'text' || clip.type === 'markdown' || clip.type === 'code') && clip.title && clip.title !== 'Untitled Clip' && (
-        <h3 className="mt-4 font-semibold text-ink/80 text-sm truncate">{clip.title}</h3>
+        <h3 className="mt-4 font-bold text-ink/80 text-sm truncate">{clip.title}</h3>
       )}
 
       {renderContent()}
 
-      <div className="mt-auto pt-4 flex items-center justify-between text-[10.5px] font-mono text-muted">
+      <div className="mt-auto pt-4 flex items-center justify-between text-[11px] font-mono text-ink/65">
         <div className="flex items-center gap-3 truncate">
           {clip.type === 'file' && (
             <span className="truncate max-w-[120px]" title={clip.file_name || ''}>
@@ -146,14 +169,16 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
           <span>{formatRelativeTime(clip.created_at)}</span>
           <button 
             onClick={handleCopy}
-            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/5 text-muted hover:text-ink"
+            className="p-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-ink/50 hover:text-ink"
+            style={{ border: '2px solid transparent' }}
             title="Copy to clipboard"
           >
             <Copy size={13} />
           </button>
           <button 
             onClick={handleDelete}
-            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/5 text-muted hover:text-coral"
+            className="p-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-ink/50 hover:text-pink"
+            style={{ border: '2px solid transparent' }}
             title="Delete clip"
           >
             <Trash2 size={13} />

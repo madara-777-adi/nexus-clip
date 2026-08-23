@@ -18,7 +18,13 @@ export const ClipGrid: React.FC = () => {
   if (loading) {
     return (
       <div className="mt-12 flex justify-center">
-        <div className="w-6 h-6 border-2 border-mint border-t-transparent rounded-full animate-spin" />
+        <div
+          className="w-6 h-6 animate-spin"
+          style={{
+            border: '3px solid var(--ink)',
+            borderTopColor: 'transparent',
+          }}
+        />
       </div>
     );
   }
@@ -33,16 +39,20 @@ export const ClipGrid: React.FC = () => {
 
   return (
     <div className="mt-8 flex flex-col gap-6">
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2">
         {FILTER_TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setFilterType(tab.id)}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap ${
+            className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
               filterType === tab.id
-                ? 'clay-pressed text-mint'
-                : 'clay-raised text-muted hover:text-ink'
+                ? 'bg-ink text-paper'
+                : 'bg-card text-ink hover:bg-ink hover:text-paper'
             }`}
+            style={{
+              border: '3px solid var(--ink)',
+              boxShadow: filterType === tab.id ? '3px 3px 0 var(--pink)' : 'none',
+            }}
           >
             {tab.label}
           </button>
@@ -51,18 +61,21 @@ export const ClipGrid: React.FC = () => {
 
       {sortedClips.length === 0 ? (
         <div className="py-20 flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 rounded-3xl clay-pressed flex items-center justify-center mb-4">
-            <span className="text-2xl opacity-50">📭</span>
+          <div
+            className="w-16 h-16 flex items-center justify-center mb-4 bg-card"
+            style={{ border: '4px solid var(--ink)', boxShadow: '6px 6px 0 var(--ink)' }}
+          >
+            <span className="text-2xl">📭</span>
           </div>
           <h3 className="text-lg font-display text-ink mb-2">No clips found</h3>
-          <p className="text-muted text-sm max-w-sm">
+          <p className="text-ink/65 text-sm max-w-sm">
             {searchQuery 
               ? `No results match "${searchQuery}"`
               : "Nothing here yet. Paste, drop, or upload to start this board."}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[22px]">
+        <div className="clip-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '26px' }}>
           {sortedClips.map(clip => (
             <ClipCard key={clip.id} clip={clip} />
           ))}

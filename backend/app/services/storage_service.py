@@ -27,6 +27,9 @@ ALLOWED_EXTENSIONS = {
     ".py", ".js", ".ts", ".css", ".java", ".cpp", ".rs", ".go",
 }
 
+# Chunk size for streaming reads (64 KB)
+_READ_CHUNK_SIZE = 64 * 1024
+
 
 class StorageService:
     """Service handling file storage (local disk).
@@ -38,7 +41,12 @@ class StorageService:
     """
 
     async def save_file(self, file: UploadFile) -> dict[str, str | int]:
-        """Validate and save uploaded file, returning metadata."""
+        """Validate and save uploaded file, returning metadata.
+
+        The file is read in chunks so that an oversized payload is rejected
+        as soon as the cumulative size exceeds the configured limit, rather
+        than buffering the entire body into memory first.
+        """
         if not file.filename:
             raise ValidationError("File must have a filename.")
 
@@ -49,15 +57,35 @@ class StorageService:
                 f"Permitted types: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
             )
 
-        content = await file.read()
-        file_size = len(content)
-
         max_bytes = settings.max_upload_size_mb * 1024 * 1024
-        if file_size > max_bytes:
+
+        # --- Early rejection via Content-Length header (if available) ---
+        # Starlette's UploadFile exposes .size from the multipart parser
+        # when the client sends a Content-Length header.  Check it first
+        # to avoid even starting the chunked read for obviously-too-large
+        # uploads.
+        if file.size is not None and file.size > max_bytes:
             raise FileTooLargeError(
-                f"File size {file_size / (1024 * 1024):.1f} MB exceeds the "
+                f"File size {file.size / (1024 * 1024):.1f} MB exceeds the "
                 f"{settings.max_upload_size_mb} MB limit."
             )
+
+        # --- Streaming read with cumulative size guard ---
+        chunks: list[bytes] = []
+        total_size = 0
+        while True:
+            chunk = await file.read(_READ_CHUNK_SIZE)
+            if not chunk:
+                break
+            total_size += len(chunk)
+            if total_size > max_bytes:
+                raise FileTooLargeError(
+                    f"File size exceeds the {settings.max_upload_size_mb} MB limit."
+                )
+            chunks.append(chunk)
+
+        content = b"".join(chunks)
+        file_size = len(content)
 
         file_id = str(uuid.uuid4())
         safe_filename = f"{file_id}_{Path(file.filename).name}"
@@ -81,9 +109,9 @@ class StorageService:
         if not file_url.startswith("/static/uploads/"):
             return
         filename = file_url.replace("/static/uploads/", "")
-        file_path = UPLOAD_DIR / filename
-        if file_path.exists():
-            try:
+        try:
+            file_path = (UPLOAD_DIR / filename).resolve()
+            if file_path.is_relative_to(UPLOAD_DIR.resolve()) and file_path.is_file():
                 os.remove(file_path)
-            except OSError:
-                pass
+        except (OSError, ValueError):
+            pass

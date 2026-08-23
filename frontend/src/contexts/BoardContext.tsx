@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from '../services/api';
 import type { Board, Clip, ClipType, GuestSession } from '../types';
 import { useAuth } from './AuthContext';
@@ -56,16 +56,7 @@ export const BoardProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  useEffect(() => {
-    setIsGuestMode(!isAuthenticated);
-    if (isAuthenticated) {
-      fetchBoards();
-    } else {
-      fetchGuestBoard();
-    }
-  }, [isAuthenticated, user]);
-
-  const fetchGuestBoard = async () => {
+  const fetchGuestBoard = useCallback(async () => {
     setLoading(true);
     try {
       const session = await api.getGuestBoard();
@@ -76,9 +67,9 @@ export const BoardProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchBoards = async () => {
+  const fetchBoards = useCallback(async () => {
     setLoading(true);
     try {
       const list = await api.getBoards();
@@ -91,9 +82,9 @@ export const BoardProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeBoardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchClips = async () => {
+  const fetchClips = useCallback(async () => {
     if (isGuestMode) {
       await fetchGuestBoard();
       return;
@@ -121,11 +112,20 @@ export const BoardProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeBoardId, isGuestMode, searchQuery, filterType, fetchGuestBoard]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setIsGuestMode(!isAuthenticated);
+    if (isAuthenticated) {
+      fetchBoards();
+    } else {
+      fetchGuestBoard();
+    }
+  }, [isAuthenticated, user, fetchBoards, fetchGuestBoard]);
 
   useEffect(() => {
     fetchClips();
-  }, [activeBoardId, isGuestMode, searchQuery, filterType]);
+  }, [fetchClips]);
 
   const createBoard = async (name: string) => {
     const board = await api.createBoard(name);

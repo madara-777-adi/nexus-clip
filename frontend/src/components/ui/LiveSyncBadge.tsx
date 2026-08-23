@@ -6,8 +6,11 @@ export const LiveSyncBadge: React.FC = () => {
 
   if (status === 'connecting') {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full clay-raised text-xs font-semibold uppercase tracking-wider text-muted">
-        <div className="w-2 h-2 rounded-full bg-muted"></div>
+      <div
+        className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-ink bg-card"
+        style={{ border: '3px solid var(--ink)' }}
+      >
+        <div className="w-2 h-2 bg-ink/40"></div>
         Connecting...
       </div>
     );
@@ -15,18 +18,24 @@ export const LiveSyncBadge: React.FC = () => {
 
   if (status === 'disconnected') {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full clay-raised text-xs font-semibold uppercase tracking-wider text-coral">
-        <div className="w-2 h-2 rounded-full bg-coral"></div>
+      <div
+        className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-pink bg-card"
+        style={{ border: '3px solid var(--ink)' }}
+      >
+        <div className="w-2 h-2 bg-pink"></div>
         Reconnecting...
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full clay-raised text-xs font-semibold uppercase tracking-wider text-muted">
+    <div
+      className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-ink bg-card"
+      style={{ border: '3px solid var(--ink)' }}
+    >
       <div className="relative flex h-2 w-2">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-mint opacity-75 duration-[1800ms]"></span>
-        <span className="relative inline-flex rounded-full h-2 w-2 bg-mint"></span>
+        <span className="animate-ping absolute inline-flex h-full w-full bg-cyan opacity-75 duration-[1800ms]"></span>
+        <span className="relative inline-flex h-2 w-2 bg-cyan"></span>
       </div>
       Synced
     </div>

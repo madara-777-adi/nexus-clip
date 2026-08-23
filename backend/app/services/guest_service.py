@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.cache.redis import get_redis_client
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import InternalServerError, NotFoundError
 from app.models.clip import ClipType
 from app.models.user import User
 from app.services.board_service import BoardService
@@ -20,8 +20,14 @@ class GuestService:
 
     @staticmethod
     def generate_board_code() -> str:
-        """Generate a random 6-char alpha-numeric board code (e.g. NEXUS-A1B2)."""
-        suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        """Generate a board code with an 8-char random suffix (e.g. NEXUS-A1B2C3D4).
+
+        The ``NEXUS-`` prefix is fixed and adds zero entropy.  The suffix
+        uses uppercase letters + digits (36 symbols), so k=8 yields
+        36^8 ≈ 2.82 × 10¹² possible codes — infeasible to brute-force
+        even without rate-limiting.
+        """
+        suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
         return f"NEXUS-{suffix}"
 
     async def get_or_create_session(
@@ -29,7 +35,9 @@ class GuestService:
         guest_session_id: str | None = None,
     ) -> dict[str, Any]:
         """Fetch existing guest session or initialize a new one in Redis."""
-        redis = await get_redis_client()
+        redis = get_redis_client()
+        if redis is None:
+            raise InternalServerError("Redis is currently unavailable. Cannot process guest sessions.")
 
         if guest_session_id:
             key = f"guest_session:{guest_session_id}"
@@ -44,7 +52,7 @@ class GuestService:
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=GUEST_BOARD_TTL_SECONDS)
 
-        session_data = {
+        session_data: dict[str, Any] = {
             "guest_session_id": new_id,
             "board_code": None,  # Hidden until first clip is created
             "board_name": "Guest Board",
@@ -73,7 +81,9 @@ class GuestService:
         tags: list[str] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Add a clip to guest session in Redis. Generates Board Code on 1st clip."""
-        redis = await get_redis_client()
+        redis = get_redis_client()
+        if redis is None:
+            raise InternalServerError("Redis is currently unavailable.")
         session = await self.get_or_create_session(guest_session_id)
 
         # Per PRODUCT_SPEC.md §4: Board Code appears after first Clip is created
@@ -115,7 +125,9 @@ class GuestService:
 
     async def continue_guest_board(self, board_code: str) -> dict[str, Any]:
         """Find guest session by board code for cross-device continuation."""
-        redis = await get_redis_client()
+        redis = get_redis_client()
+        if redis is None:
+            raise InternalServerError("Redis is currently unavailable.")
         clean_code = board_code.strip().upper()
         session_id = await redis.get(f"guest_code:{clean_code}")
 
@@ -133,7 +145,9 @@ class GuestService:
         board_service: BoardService,
     ) -> tuple[uuid.UUID, str, int]:
         """Promote guest board clips into a permanent User Board upon login."""
-        redis = await get_redis_client()
+        redis = get_redis_client()
+        if redis is None:
+            raise InternalServerError("Redis is currently unavailable.")
         session = await self.get_or_create_session(guest_session_id)
 
         clips_data = session.get("clips", [])

@@ -55,8 +55,12 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
 
     cors_origins: list[str] = Field(
-        default=["http://localhost:3000"],
-        description="Allowed CORS origins",
+        default=["http://localhost:5173", "http://localhost:3000"],
+        description=(
+            "Allowed CORS origins.  Defaults include Vite (5173) and CRA (3000) "
+            "dev servers.  Production MUST override via CORS_ORIGINS env var with "
+            "the actual frontend domain(s), e.g. '[\"https://nexusclip.app\"]'."
+        ),
     )
 
     # ------------------------------------------------------------------
@@ -115,7 +119,6 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
 
     redis_url: str = Field(
-        default="redis://localhost:6379/0",
         description="Redis connection URL",
     )
 
@@ -153,4 +156,4 @@ class Settings(BaseSettings):
         return self.environment == "development"
 
 
-settings = Settings()
+settings = Settings()  # type: ignore

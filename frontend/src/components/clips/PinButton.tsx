@@ -25,15 +25,16 @@ export const PinButton: React.FC<PinButtonProps> = ({ clipId, isPinned }) => {
       onClick={handleToggle}
       aria-label={isPinned ? 'Unpin clip' : 'Pin clip'}
       className={clsx(
-        "w-[30px] h-[30px] rounded-[11px] flex items-center justify-center transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint focus-visible:ring-offset-2 focus-visible:ring-offset-[#2B2E3D]",
-        isPinned ? "clay-pressed" : "clay-raised hover:brightness-110"
+        "w-[28px] h-[28px] flex items-center justify-center transition-all duration-150",
+        isPinned ? "bg-pink text-card" : "bg-card text-ink hover:bg-ink/10"
       )}
+      style={{ border: '2px solid var(--ink)' }}
     >
       <Pin
         size={14}
         className={clsx(
           "transition-colors duration-150",
-          isPinned ? "text-coral fill-coral" : "text-muted"
+          isPinned ? "fill-card" : ""
         )}
       />
     </button>

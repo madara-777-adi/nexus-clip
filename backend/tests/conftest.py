@@ -1,5 +1,5 @@
-from typing import AsyncGenerator
-import pytest
+from collections.abc import AsyncGenerator
+
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -70,7 +70,7 @@ async def client(db_session: AsyncSession, monkeypatch) -> AsyncGenerator[AsyncC
     app.dependency_overrides[get_db] = _get_db_override
 
     # Patch redis
-    async def _mock_get_redis():
+    def _mock_get_redis():
         return mock_redis_instance
 
     monkeypatch.setattr("app.cache.redis.get_redis_client", _mock_get_redis)
