@@ -4,6 +4,7 @@ import type { Clip } from '../../types';
 import { ClipTypeChip } from './ClipTypeChip';
 import { PinButton } from './PinButton';
 import { useBoard } from '../../contexts/BoardContext';
+import { resolveFileUrl } from '../../services/api';
 import clsx from 'clsx';
 
 interface ClipCardProps {
@@ -47,7 +48,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
       navigator.clipboard.writeText(clip.content);
       showToast('Copied to clipboard');
     } else if (clip.file_url) {
-      navigator.clipboard.writeText(window.location.origin + clip.file_url);
+      navigator.clipboard.writeText(resolveFileUrl(clip.file_url));
       showToast('File URL copied');
     }
   };
@@ -85,7 +86,7 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
         return (
           <div className="mt-4 overflow-hidden flex items-center justify-center">
             <img 
-              src={clip.file_url || ''} 
+              src={clip.file_url ? resolveFileUrl(clip.file_url) : ''} 
               alt={clip.title}
               className="max-h-[300px] w-full object-contain"
               style={{ border: '3px solid var(--ink)' }}
@@ -108,7 +109,20 @@ export const ClipCard: React.FC<ClipCardProps> = ({ clip }) => {
           </div>
         );
       case 'file':
-        return null; // File name is shown in the footer
+        return clip.file_url ? (
+          <div className="mt-4">
+            <a
+              href={resolveFileUrl(clip.file_url)}
+              download={clip.file_name || true}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-violet hover:underline text-sm break-all font-mono font-bold"
+              style={{ borderBottom: '2px solid var(--violet)' }}
+            >
+              Download {clip.file_name || 'file'}
+            </a>
+          </div>
+        ) : null; // File name is also shown in the footer
       case 'text':
       default:
         return (

@@ -2,6 +2,14 @@ import type { APIResponse, Board, Clip, ClipType, GuestSession, User, UserSettin
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
+// API_BASE_URL includes the /api/v1 suffix, but static files (/static/uploads/...)
+// are served from the API's origin, not under /api/v1. Strip the suffix to get
+// the bare origin for building file URLs.
+export const API_ORIGIN = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+
+/** Build an absolute URL for a file_url returned by the backend (e.g. "/static/uploads/xyz"). */
+export const resolveFileUrl = (fileUrl: string): string => `${API_ORIGIN}${fileUrl}`;
+
 class ApiClient {
   private getHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
     const headers: Record<string, string> = {
