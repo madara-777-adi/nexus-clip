@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from typing import ClassVar
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -42,6 +43,24 @@ class MockRedis:
         for name in names:
             self.store.pop(name, None)
 
+    async def publish(self, channel: str, message: str):
+        return 0
+
+
+class MockR2StorageDriver:
+    """In-memory R2 replacement for upload tests."""
+
+    objects: ClassVar[dict[str, bytes]] = {}
+
+    async def save(self, key: str, content: bytes, content_type: str) -> None:
+        self.objects[key] = content
+
+    async def read(self, key: str) -> bytes:
+        return self.objects[key]
+
+    async def delete(self, key: str) -> None:
+        self.objects.pop(key, None)
+
 
 mock_redis_instance = MockRedis()
 
@@ -79,6 +98,9 @@ async def client(db_session: AsyncSession, monkeypatch) -> AsyncGenerator[AsyncC
     monkeypatch.setattr("app.cache.redis.get_redis_client", _mock_get_redis)
     monkeypatch.setattr("app.services.guest_service.get_redis_client", _mock_get_redis)
     monkeypatch.setattr("app.services.storage_service.get_redis_client", _mock_get_redis)
+    monkeypatch.setattr("app.storage.service.get_redis_client", _mock_get_redis)
+    MockR2StorageDriver.objects.clear()
+    monkeypatch.setattr("app.storage.service.CloudflareR2StorageDriver", MockR2StorageDriver)
     mock_redis_instance.store.clear()
     await mock_redis_instance.set("guest_session:guest-upload-test", "{}")
 

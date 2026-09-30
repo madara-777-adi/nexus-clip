@@ -52,6 +52,8 @@ class WebSocketConnectionManager:
         client = get_redis_client()
         if client is None:
             logger.warning("Cannot subscribe WebSocket clients: Redis is unavailable.")
+            if self.subscription_tasks.get(board_id) is asyncio.current_task():
+                self.subscription_tasks.pop(board_id, None)
             return
 
         pubsub = client.pubsub()

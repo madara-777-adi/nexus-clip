@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user, oauth2_scheme
+from app.auth.google import verify_google_id_token
 from app.auth.jwt import revoke_access_token
 from app.db.session import get_db
 from app.middleware.rate_limit import limiter
 from app.models.user import User
 from app.schemas.auth import (
+    GoogleLoginRequest,
     TokenResponse,
     UserLoginRequest,
     UserProfileResponse,
@@ -72,6 +74,36 @@ async def login(
         data=TokenResponse(
             access_token=token,
             user=profile,
+        ),
+    )
+
+
+@router.post(
+    "/google",
+    response_model=APIResponse[TokenResponse],
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("5/minute")
+async def google_login(
+    request: Request,
+    body: GoogleLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[TokenResponse]:
+    """Verify a Google ID token and authenticate or create the user."""
+    google_user = verify_google_id_token(body.id_token)
+    service = AuthService(db)
+    user, token = await service.get_or_create_google_user(
+        google_id=google_user.google_id,
+        email=google_user.email,
+        full_name=google_user.full_name,
+        avatar_url=google_user.avatar_url,
+    )
+    return APIResponse(
+        success=True,
+        message="Authentication successful.",
+        data=TokenResponse(
+            access_token=token,
+            user=UserProfileResponse.model_validate(user),
         ),
     )
 

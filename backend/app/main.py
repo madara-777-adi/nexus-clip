@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.router import router
+from app.cache.cache_manager import websocket_manager
 from app.cache.redis import connect_redis, disconnect_redis
 from app.core.config import settings
 from app.core.exceptions import APIException
@@ -90,6 +91,7 @@ async def lifespan(app: FastAPI):
             cleanup_task.cancel()
             with suppress(asyncio.CancelledError):
                 await cleanup_task
+            await websocket_manager.shutdown()
 
     finally:
         try:

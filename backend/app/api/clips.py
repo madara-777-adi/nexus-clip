@@ -4,9 +4,13 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
+from app.auth.jwt import is_access_token_revoked, verify_access_token
 from app.cache.cache_manager import publish_board_event, websocket_manager
-from app.db.session import get_db
+from app.core.exceptions import APIException
+from app.db.session import AsyncSessionLocal, get_db
 from app.models.user import User
+from app.repositories.board_repository import BoardRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.clip import (
     ClipListResponse,
     ClipResponse,
@@ -24,6 +28,26 @@ router = APIRouter(
 @router.websocket("/ws/boards/{board_id}")
 async def board_websocket(websocket: WebSocket, board_id: uuid.UUID) -> None:
     """Subscribe this worker's clients to events for one board."""
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        return
+
+    try:
+        user_id = verify_access_token(token)
+        if await is_access_token_revoked(token):
+            await websocket.close(code=1008)
+            return
+        async with AsyncSessionLocal() as db:
+            user = await UserRepository(db).get_by_id(user_id)
+            board = await BoardRepository(db).get_by_id(board_id, user_id) if user else None
+            if board is None:
+                await websocket.close(code=1008)
+                return
+    except APIException:
+        await websocket.close(code=1008)
+        return
+
     board_id_text = str(board_id)
     await websocket_manager.connect(board_id_text, websocket)
     try:

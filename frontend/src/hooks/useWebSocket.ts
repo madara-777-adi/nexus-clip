@@ -15,7 +15,9 @@ const HEARTBEAT_INTERVAL = 30_000;
 
 const getWebSocketUrl = (boardId: string): string => {
   const baseUrl = API_BASE_URL.replace(/^http/, 'ws').replace(/\/$/, '');
-  return `${baseUrl}/ws/boards/${encodeURIComponent(boardId)}`;
+  const token = localStorage.getItem('nexus_auth_token');
+  const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
+  return `${baseUrl}/ws/boards/${encodeURIComponent(boardId)}${tokenQuery}`;
 };
 
 export function useWebSocket(boardId: string | null = null) {
