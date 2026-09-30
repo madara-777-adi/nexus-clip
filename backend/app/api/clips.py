@@ -7,6 +7,7 @@ from app.api.dependencies import get_current_user
 from app.auth.jwt import is_access_token_revoked, verify_access_token
 from app.cache.cache_manager import publish_board_event, websocket_manager
 from app.core.exceptions import APIException
+from app.core.logging import get_logger
 from app.db.session import AsyncSessionLocal, get_db
 from app.models.user import User
 from app.repositories.board_repository import BoardRepository
@@ -23,6 +24,7 @@ from app.services.clip_service import ClipService
 router = APIRouter(
     tags=["clips"],
 )
+logger = get_logger(__name__)
 
 
 @router.websocket("/ws/boards/{board_id}")
@@ -44,8 +46,13 @@ async def board_websocket(websocket: WebSocket, board_id: uuid.UUID) -> None:
             if board is None:
                 await websocket.close(code=1008)
                 return
-    except APIException:
-        await websocket.close(code=1008)
+    except APIException as exc:
+        close_code = 1008 if exc.status_code < 500 else 1013
+        await websocket.close(code=close_code)
+        return
+    except Exception:
+        logger.exception("WebSocket authentication service failed for board '%s'.", board_id)
+        await websocket.close(code=1013)
         return
 
     board_id_text = str(board_id)
