@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from '../services/api';
 import type { Board, Clip, ClipType, GuestSession } from '../types';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { useAuth } from './AuthContext';
 
 interface BoardContextType {
@@ -50,6 +51,7 @@ export const BoardProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterType, setFilterType] = useState<ClipType | 'all'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const { lastMessage } = useWebSocket(isGuestMode ? null : activeBoardId);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -141,6 +143,37 @@ export const BoardProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     fetchClips();
   }, [fetchClips]);
+
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    const eventType = lastMessage.type || lastMessage.event;
+    if (!eventType) return;
+
+    const payload = lastMessage.data;
+    const eventData = payload && typeof payload === 'object'
+      ? payload as Record<string, unknown>
+      : lastMessage;
+    const clipValue = eventData.clip ?? lastMessage.clip ?? eventData;
+    const clip = clipValue as Partial<Clip>;
+    const clipId = typeof eventData.clip_id === 'string'
+      ? eventData.clip_id
+      : typeof lastMessage.clip_id === 'string'
+        ? lastMessage.clip_id
+        : clip.id;
+
+    if (eventType === 'CLIP_CREATED' && clip.id) {
+      setClips((current) => current.some((item) => item.id === clip.id)
+        ? current
+        : [...current, clip as Clip]);
+    }
+    if (eventType === 'CLIP_UPDATED' && clip.id) {
+      setClips((current) => current.map((item) => item.id === clip.id ? { ...item, ...clip } : item));
+    }
+    if (eventType === 'CLIP_DELETED' && clipId) {
+      setClips((current) => current.filter((item) => item.id !== clipId));
+    }
+  }, [lastMessage]);
 
   const createBoard = async (name: string) => {
     const board = await api.createBoard(name);

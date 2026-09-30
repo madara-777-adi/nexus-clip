@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import AliasChoices, Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,7 +56,11 @@ class Settings(BaseSettings):
 
     cors_origins_raw: str = Field(
         default="http://localhost:5173,http://localhost:3000",
-        alias="CORS_ORIGINS",
+        validation_alias=AliasChoices(
+            "CORS_ORIGINS",
+            "ALLOWED_ORIGINS",
+            "cors_origins_raw",
+        ),
         description=(
             "Comma-separated list of allowed CORS origins (no brackets/quotes "
             "needed). Defaults to Vite (5173) and CRA (3000) dev servers. "
@@ -69,6 +73,15 @@ class Settings(BaseSettings):
     def cors_origins(self) -> list[str]:
         """Parsed list of allowed origins, trimmed and empty entries dropped."""
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
+
+    @field_validator("cors_origins_raw")
+    @classmethod
+    def validate_production_origins(cls, value: str, info: ValidationInfo) -> str:
+        """Reject permissive wildcard CORS origins in production."""
+        origins = [origin.strip() for origin in value.split(",")]
+        if info.data.get("environment") == "production" and any("*" in origin for origin in origins):
+            raise ValueError("Wildcard origins are not allowed when environment is production.")
+        return value
 
     # ------------------------------------------------------------------
     # Logging
@@ -111,6 +124,14 @@ class Settings(BaseSettings):
         description="Secret used to sign JWT access tokens",
     )
 
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def validate_jwt_secret_key(cls, value: str) -> str:
+        """Require enough entropy for the JWT signing secret."""
+        if len(value) < 32:
+            raise ValueError("JWT_SECRET_KEY must be at least 32 characters long.")
+        return value
+
     jwt_algorithm: str = Field(
         default="HS256",
         description="JWT signing algorithm",
@@ -152,7 +173,7 @@ class Settings(BaseSettings):
     # Object storage
     # ------------------------------------------------------------------
 
-    r2_account_id: str | None = Field(default=None)
+    r2_endpoint_url: str | None = Field(default=None, alias="R2_ENDPOINT_URL")
     r2_access_key_id: str | None = Field(default=None)
     r2_secret_access_key: str | None = Field(default=None)
     r2_bucket_name: str | None = Field(default=None)

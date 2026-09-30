@@ -74,6 +74,15 @@ class ApiClient {
     return res.data;
   }
 
+  async googleAuth(token: string): Promise<{ access_token: string; user: User }> {
+    const res = await this.request<{ access_token: string; user: User }>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ id_token: token }),
+    });
+    localStorage.setItem('nexus_auth_token', res.data.access_token);
+    return res.data;
+  }
+
   async getMe(): Promise<User> {
     const res = await this.request<User>('/auth/me');
     return res.data;

@@ -2,8 +2,8 @@ import json
 import os
 import secrets
 import uuid
+from functools import partial
 from pathlib import Path
-from typing import Any
 
 import anyio
 import boto3
@@ -44,33 +44,64 @@ _READ_CHUNK_SIZE = 64 * 1024
 FILE_ACCESS_TTL_SECONDS = 86400
 
 
-class StorageService:
-    """Service handling durable R2 storage with a development-only local fallback."""
+class CloudflareR2StorageDriver:
+    """Persist uploaded objects in Cloudflare R2 through its S3 API."""
 
-    @staticmethod
-    def _r2_configured() -> bool:
-        return all(
-            (
-                settings.r2_account_id,
-                settings.r2_access_key_id,
-                settings.r2_secret_access_key,
-                settings.r2_bucket_name,
+    def __init__(self) -> None:
+        required = {
+            "R2_ENDPOINT_URL": settings.r2_endpoint_url,
+            "R2_ACCESS_KEY_ID": settings.r2_access_key_id,
+            "R2_SECRET_ACCESS_KEY": settings.r2_secret_access_key,
+            "R2_BUCKET_NAME": settings.r2_bucket_name,
+        }
+        missing = [name for name, value in required.items() if not value]
+        if missing:
+            raise InternalServerError(
+                f"Cloudflare R2 storage is not configured: missing {', '.join(missing)}."
             )
-        )
-
-    @staticmethod
-    def _r2_client() -> Any:
-        if not StorageService._r2_configured():
-            if settings.is_production:
-                raise InternalServerError("Durable object storage is not configured.")
-            return None
-        return boto3.client(
+        self.bucket_name = settings.r2_bucket_name
+        self.client = boto3.client(
             "s3",
-            endpoint_url=f"https://{settings.r2_account_id}.r2.cloudflarestorage.com",
+            endpoint_url=settings.r2_endpoint_url,
             aws_access_key_id=settings.r2_access_key_id,
             aws_secret_access_key=settings.r2_secret_access_key,
             region_name="auto",
         )
+
+    async def save(self, key: str, content: bytes, content_type: str) -> None:
+        await anyio.to_thread.run_sync(
+            partial(
+                self.client.put_object,
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=content,
+                ContentType=content_type,
+            ),
+        )
+
+    async def read(self, key: str) -> bytes:
+        response = await anyio.to_thread.run_sync(
+            partial(self.client.get_object, Bucket=self.bucket_name, Key=key),
+        )
+        return await anyio.to_thread.run_sync(response["Body"].read)
+
+    async def delete(self, key: str) -> None:
+        await anyio.to_thread.run_sync(
+            partial(self.client.delete_object, Bucket=self.bucket_name, Key=key),
+        )
+
+
+class StorageService:
+    """Service handling durable R2 storage and file access authorization."""
+
+    def __init__(self, driver: CloudflareR2StorageDriver | None = None) -> None:
+        self.driver = driver
+
+    @property
+    def r2_driver(self) -> CloudflareR2StorageDriver:
+        if self.driver is None:
+            self.driver = CloudflareR2StorageDriver()
+        return self.driver
 
     async def save_file(
         self,
@@ -127,36 +158,21 @@ class StorageService:
 
         file_id = str(uuid.uuid4())
         safe_filename = f"{file_id}_{Path(file.filename).name}"
-        r2_client = self._r2_client()
-        if r2_client is None:
-            destination = UPLOAD_DIR / safe_filename
-            async with await anyio.open_file(destination, "wb") as f:
-                await f.write(content)
-        else:
-            await anyio.to_thread.run_sync(
-                r2_client.put_object,
-                Bucket=settings.r2_bucket_name,
-                Key=safe_filename,
-                Body=content,
-                ContentType=file.content_type or "application/octet-stream",
-            )
+        await self.r2_driver.save(
+            safe_filename,
+            content,
+            file.content_type or "application/octet-stream",
+        )
 
         access_token = secrets.token_urlsafe(32)
         redis = get_redis_client()
         if redis is None:
-            if r2_client is None:
-                destination.unlink(missing_ok=True)
-            else:
-                await anyio.to_thread.run_sync(
-                    r2_client.delete_object,
-                    Bucket=settings.r2_bucket_name,
-                    Key=safe_filename,
-                )
+            await self.r2_driver.delete(safe_filename)
             raise InternalServerError("Redis is currently unavailable. Cannot secure uploaded files.")
         metadata = {
             "file_id": file_id,
             "filename": safe_filename,
-            "storage": "r2" if r2_client is not None else "local",
+            "storage": "r2",
             "owner_id": owner_id,
             "owner_type": owner_type,
         }
@@ -164,14 +180,7 @@ class StorageService:
         if owner_type == "guest":
             guest_session = await redis.get(f"guest_session:{owner_id}")
             if not guest_session:
-                if r2_client is None:
-                    destination.unlink(missing_ok=True)
-                else:
-                    await anyio.to_thread.run_sync(
-                        r2_client.delete_object,
-                        Bucket=settings.r2_bucket_name,
-                        Key=safe_filename,
-                    )
+                await self.r2_driver.delete(safe_filename)
                 raise ForbiddenError("Guest session is invalid or expired.")
         if ttl:
             await redis.setex(
@@ -220,18 +229,9 @@ class StorageService:
         return metadata
 
     async def read_file(self, metadata: dict[str, str]) -> tuple[bytes, str]:
-        """Read an authorized file from R2 or the development fallback."""
+        """Read an authorized file from R2 or a legacy local record."""
         if metadata.get("storage") == "r2":
-            client = self._r2_client()
-            if client is None:
-                raise InternalServerError("Durable object storage is not configured.")
-            response = await anyio.to_thread.run_sync(
-                client.get_object,
-                Bucket=settings.r2_bucket_name,
-                Key=metadata["filename"],
-            )
-            body = await anyio.to_thread.run_sync(response["Body"].read)
-            return body, metadata["filename"]
+            return await self.r2_driver.read(metadata["filename"]), metadata["filename"]
 
         file_path = (UPLOAD_DIR / metadata["filename"]).resolve()
         if not file_path.is_relative_to(UPLOAD_DIR.resolve()) or not file_path.is_file():
@@ -250,14 +250,7 @@ class StorageService:
             owner_type=owner_type,
         )
         if metadata.get("storage") == "r2":
-            client = self._r2_client()
-            if client is None:
-                raise InternalServerError("Durable object storage is not configured.")
-            await anyio.to_thread.run_sync(
-                client.delete_object,
-                Bucket=settings.r2_bucket_name,
-                Key=filename,
-            )
+            await self.r2_driver.delete(filename)
         else:
             file_path = (UPLOAD_DIR / filename).resolve()
             if not file_path.is_relative_to(UPLOAD_DIR.resolve()):

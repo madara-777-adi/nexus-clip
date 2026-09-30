@@ -4,7 +4,7 @@ from app.api.dependencies import get_optional_current_user
 from app.core.exceptions import UnauthorizedError
 from app.models.user import User
 from app.schemas.response import APIResponse
-from app.services.storage_service import StorageService
+from app.storage.service import StorageService
 
 router = APIRouter(
     prefix="/upload",

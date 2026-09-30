@@ -1,9 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
+from app.cache.cache_manager import publish_board_event, websocket_manager
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.clip import (
@@ -18,6 +19,22 @@ from app.services.clip_service import ClipService
 router = APIRouter(
     tags=["clips"],
 )
+
+
+@router.websocket("/ws/boards/{board_id}")
+async def board_websocket(websocket: WebSocket, board_id: uuid.UUID) -> None:
+    """Subscribe this worker's clients to events for one board."""
+    board_id_text = str(board_id)
+    await websocket_manager.connect(board_id_text, websocket)
+    try:
+        while True:
+            message = await websocket.receive_text()
+            if message == '{"type":"ping"}':
+                await websocket.send_text('{"type":"pong"}')
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await websocket_manager.disconnect(board_id_text, websocket)
 
 
 @router.get(
@@ -78,10 +95,15 @@ async def create_clip(
         tags=request.tags,
         is_pinned=request.is_pinned,
     )
+    clip_response = ClipResponse.model_validate(clip)
+    await publish_board_event(
+        str(board_id),
+        {"type": "CLIP_CREATED", "data": {"clip": clip_response}},
+    )
     return APIResponse(
         success=True,
         message="Clip created successfully.",
-        data=ClipResponse.model_validate(clip),
+        data=clip_response,
     )
 
 
@@ -126,10 +148,15 @@ async def update_clip(
         tags=request.tags,
         is_pinned=request.is_pinned,
     )
+    clip_response = ClipResponse.model_validate(clip)
+    await publish_board_event(
+        str(clip.board_id),
+        {"type": "CLIP_UPDATED", "data": {"clip": clip_response}},
+    )
     return APIResponse(
         success=True,
         message="Clip updated successfully.",
-        data=ClipResponse.model_validate(clip),
+        data=clip_response,
     )
 
 
@@ -146,10 +173,15 @@ async def toggle_pin(
     """Toggle clip pin state."""
     service = ClipService(db)
     clip = await service.toggle_pin(clip_id, current_user)
+    clip_response = ClipResponse.model_validate(clip)
+    await publish_board_event(
+        str(clip.board_id),
+        {"type": "CLIP_UPDATED", "data": {"clip": clip_response}},
+    )
     return APIResponse(
         success=True,
         message="Clip pin state toggled.",
-        data=ClipResponse.model_validate(clip),
+        data=clip_response,
     )
 
 
@@ -165,7 +197,12 @@ async def delete_clip(
 ) -> APIResponse[None]:
     """Delete a clip."""
     service = ClipService(db)
+    clip = await service.get_clip(clip_id, current_user)
     await service.delete_clip(clip_id, current_user)
+    await publish_board_event(
+        str(clip.board_id),
+        {"type": "CLIP_DELETED", "data": {"clip_id": str(clip_id)}},
+    )
     return APIResponse(
         success=True,
         message="Clip deleted successfully.",

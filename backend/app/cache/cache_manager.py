@@ -1,6 +1,10 @@
+import asyncio
 import json
+from collections import defaultdict
+from contextlib import suppress
 from typing import Any
 
+from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from redis.asyncio import RedisError
 
@@ -9,6 +13,108 @@ from app.core.config import settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+BOARD_CHANNEL_PREFIX = "nexus:board:"
+
+
+class WebSocketConnectionManager:
+    """Manage worker-local WebSocket clients backed by Redis Pub/Sub."""
+
+    def __init__(self) -> None:
+        self.connections: dict[str, set[WebSocket]] = defaultdict(set)
+        self.subscription_tasks: dict[str, asyncio.Task[None]] = {}
+
+    async def connect(self, board_id: str, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self.connections[board_id].add(websocket)
+        if board_id not in self.subscription_tasks:
+            self.subscription_tasks[board_id] = asyncio.create_task(
+                self._subscribe_to_board(board_id)
+            )
+
+    async def disconnect(self, board_id: str, websocket: WebSocket) -> None:
+        board_connections = self.connections.get(board_id)
+        if board_connections is None:
+            return
+
+        board_connections.discard(websocket)
+        if board_connections:
+            return
+
+        self.connections.pop(board_id, None)
+        task = self.subscription_tasks.pop(board_id, None)
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+    async def _subscribe_to_board(self, board_id: str) -> None:
+        client = get_redis_client()
+        if client is None:
+            logger.warning("Cannot subscribe WebSocket clients: Redis is unavailable.")
+            return
+
+        pubsub = client.pubsub()
+        channel = f"{BOARD_CHANNEL_PREFIX}{board_id}"
+        try:
+            await pubsub.subscribe(channel)
+            async for message in pubsub.listen():
+                if message.get("type") != "message":
+                    continue
+                await self.broadcast(board_id, message["data"])
+        except asyncio.CancelledError:
+            raise
+        except RedisError:
+            logger.exception("Redis Pub/Sub subscription failed for board '%s'.", board_id)
+        finally:
+            with suppress(RedisError):
+                await pubsub.unsubscribe(channel)
+            await pubsub.aclose()
+            if self.subscription_tasks.get(board_id) is asyncio.current_task():
+                self.subscription_tasks.pop(board_id, None)
+
+    async def broadcast(self, board_id: str, message: str) -> None:
+        disconnected: list[WebSocket] = []
+        for websocket in self.connections.get(board_id, set()).copy():
+            try:
+                await websocket.send_text(message)
+            except (OSError, RuntimeError, WebSocketDisconnect):
+                disconnected.append(websocket)
+
+        for websocket in disconnected:
+            await self.disconnect(board_id, websocket)
+
+    async def shutdown(self) -> None:
+        tasks = list(self.subscription_tasks.values())
+        self.subscription_tasks.clear()
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            with suppress(asyncio.CancelledError):
+                await task
+        self.connections.clear()
+
+
+websocket_manager = WebSocketConnectionManager()
+
+
+async def publish_board_event(board_id: str, event: dict[str, Any]) -> bool:
+    """Publish a JSON clip event for every worker serving the board."""
+    if not settings.redis_enabled:
+        return False
+
+    client = get_redis_client()
+    if client is None:
+        logger.warning("Cannot publish board event: Redis is unavailable.")
+        return False
+
+    channel = f"{BOARD_CHANNEL_PREFIX}{board_id}"
+    try:
+        await client.publish(channel, json.dumps(jsonable_encoder(event)))
+        return True
+    except (AttributeError, RedisError, TypeError, ValueError):
+        logger.exception("Redis Pub/Sub publish failed for board '%s'.", board_id)
+        return False
 
 
 async def get(key: str) -> Any | None:

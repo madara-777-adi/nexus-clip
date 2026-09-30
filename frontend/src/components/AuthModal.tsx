@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
+import type { CredentialResponse } from '@react-oauth/google';
+import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 interface AuthModalProps {
@@ -16,6 +19,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleGoogleSuccess = async ({ credential }: CredentialResponse) => {
+    if (!credential) {
+      setError('Google sign-in did not return a credential.');
+      return;
+    }
+
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await api.googleAuth(credential);
+      onClose();
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message || 'Google authentication failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -39,11 +61,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
-      <div
-        className="w-full max-w-md bg-card p-8 relative"
-        style={{ border: '4px solid var(--ink)', boxShadow: '10px 10px 0 var(--ink)' }}
-      >
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ''}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
+        <div
+          className="w-full max-w-md bg-card p-8 relative"
+          style={{ border: '4px solid var(--ink)', boxShadow: '10px 10px 0 var(--ink)' }}
+        >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-ink bg-card hover:bg-pink hover:text-card transition-colors"
@@ -93,7 +116,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="my-6 flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-ink/60">
+          <div className="h-[3px] flex-1 bg-ink/20" />
+          Or continue with
+          <div className="h-[3px] flex-1 bg-ink/20" />
+        </div>
+
+        <div
+          className="bg-ink p-2 transition-colors hover:bg-cyan"
+          style={{ border: '3px solid var(--ink)', boxShadow: '4px 4px 0 var(--lime)' }}
+        >
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => setError('Google authentication failed')}
+            theme="filled_black"
+            size="large"
+            text="signin_with"
+            width="100%"
+            useOneTap={false}
+          />
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5 mt-6">
           {!isLoginTab && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-widest text-ink mb-2">
@@ -150,7 +194,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               : 'Create Account'}
           </button>
         </form>
+        </div>
       </div>
-    </div>
+    </GoogleOAuthProvider>
   );
 };

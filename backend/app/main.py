@@ -1,5 +1,6 @@
+import asyncio
 import mimetypes
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
@@ -14,10 +15,11 @@ from app.core.config import settings
 from app.core.exceptions import APIException
 from app.core.logging import configure_logging, get_logger
 from app.db.init_db import create_tables, init_db
-from app.db.session import close_db_engine
+from app.db.session import AsyncSessionLocal, close_db_engine
+from app.jobs.cleanup_job import run_auto_cleanup_job
 from app.middleware.rate_limit import limiter
 from app.schemas.response import ErrorResponse
-from app.services.storage_service import StorageService
+from app.storage.service import StorageService
 
 # Configure logging before acquiring logger instances
 configure_logging()
@@ -27,6 +29,21 @@ logger = get_logger(__name__)
 # This is slightly larger than max_upload_size_mb to allow for multipart
 # overhead (boundary markers, headers, form fields).
 MAX_BODY_BYTES = (settings.max_upload_size_mb + 2) * 1024 * 1024
+CLEANUP_INTERVAL_SECONDS = 60 * 60
+
+
+async def _run_cleanup_loop() -> None:
+    """Run the database cleanup job immediately and once every hour."""
+    while True:
+        try:
+            async with AsyncSessionLocal() as db:
+                await run_auto_cleanup_job(db)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Scheduled auto-cleanup job failed")
+
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
 
 
 class MaxBodySizeMiddleware(BaseHTTPMiddleware):
@@ -65,8 +82,14 @@ async def lifespan(app: FastAPI):
         await init_db()
         await create_tables()
         await connect_redis()
+        cleanup_task = asyncio.create_task(_run_cleanup_loop())
 
-        yield
+        try:
+            yield
+        finally:
+            cleanup_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await cleanup_task
 
     finally:
         try:

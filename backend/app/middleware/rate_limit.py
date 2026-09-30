@@ -1,8 +1,7 @@
-"""Rate-limiting middleware using slowapi.
+"""Redis-backed rate-limiting middleware using slowapi.
 
-The limiter is keyed on client IP and uses an in-memory backend by default.
-When Redis is available (production), the ``REDIS_URL`` will be used
-automatically via the storage URI passed at initialisation.
+The limiter is keyed on client IP and requires Redis. Requests fail closed
+with HTTP 503 when Redis is disabled, unavailable, or unreachable.
 
 Usage in endpoint modules::
 
@@ -14,18 +13,44 @@ Usage in endpoint modules::
         ...
 """
 
+from fastapi import HTTPException, Request, status
+from redis.asyncio import RedisError
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.cache import redis as redis_cache
 from app.core.config import settings
 
-# Use Redis as the rate-limit storage backend when available, falling
-# back to in-memory for tests and local development without Redis.
-_storage_uri = settings.redis_url if settings.redis_enabled else "memory://"
 
-limiter = Limiter(
+class RedisRequiredLimiter(Limiter):
+    """Limiter that refuses to process requests without a Redis backend."""
+
+    def _check_request_limit(
+        self,
+        request: Request,
+        endpoint_func,
+        in_middleware: bool = True,
+    ) -> None:
+        if not settings.redis_enabled or redis_cache.get_redis_client() is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Rate limiting service is unavailable.",
+            )
+
+        try:
+            super()._check_request_limit(request, endpoint_func, in_middleware)
+        except RedisError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Rate limiting service is unavailable.",
+            ) from exc
+
+
+limiter = RedisRequiredLimiter(
     key_func=get_remote_address,
-    storage_uri=_storage_uri,
+    storage_uri=settings.redis_url,
     # Return clean JSON 429 errors rather than raw text.
     default_limits=[],
+    in_memory_fallback_enabled=False,
+    swallow_errors=False,
 )
