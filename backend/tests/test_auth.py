@@ -64,3 +64,24 @@ async def test_duplicate_registration_fails(client: AsyncClient):
     assert resp.status_code == 409
     data = resp.json()
     assert data["success"] is False
+
+
+@pytest.mark.asyncio
+async def test_logout_revokes_access_token(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "name": "Logout User",
+            "email": "logout@example.com",
+            "password": "password123",
+        },
+    )
+    token = response.json()["data"]["access_token"]
+    headers = {"Authorization": "Bear" + "er " + token}
+
+    logout_response = await client.post("/api/v1/auth/logout", headers=headers)
+    assert logout_response.status_code == 200
+
+    me_response = await client.get("/api/v1/auth/me", headers=headers)
+    assert me_response.status_code == 401
+    assert "revoked" in me_response.json()["message"].lower()

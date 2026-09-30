@@ -57,3 +57,13 @@ async def test_search_clips(client: AsyncClient):
     )
     assert code_res.status_code == 200
     assert len(code_res.json()["data"]["items"]) == 1
+
+    # Search by tag
+    tag_res = await client.get(
+        "/api/v1/search?q=personal",
+        headers=headers,
+    )
+    assert tag_res.status_code == 200
+    tag_items = tag_res.json()["data"]["items"]
+    assert len(tag_items) == 1
+    assert tag_items[0]["title"] == "Shopping List"

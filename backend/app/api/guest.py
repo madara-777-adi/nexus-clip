@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, Header, Request, status
+import uuid
+
+from fastapi import APIRouter, Depends, Header, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
 from app.middleware.rate_limit import limiter
+from app.models.clip import ClipType
 from app.models.user import User
-from app.schemas.clip import ClipResponse, CreateClipRequest
+from app.schemas.clip import ClipListResponse, ClipResponse, CreateClipRequest
 from app.schemas.guest import (
     GuestBoardResponse,
     GuestContinueRequest,
@@ -85,6 +88,73 @@ async def continue_guest_board(
         success=True,
         message="Guest Board continued successfully.",
         data=GuestBoardResponse.model_validate(session),
+    )
+
+
+@router.get(
+    "/search",
+    response_model=APIResponse[ClipListResponse],
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("30/minute")
+async def search_guest_clips(
+    request: Request,
+    q: str | None = Query(default=None, description="Search query string"),
+    type: ClipType | None = Query(default=None, description="Clip type filter"),
+    x_guest_session_id: str = Header(...),
+) -> APIResponse[ClipListResponse]:
+    """Search clips in the active guest session."""
+    clips = await GuestService().search_guest_clips(
+        guest_session_id=x_guest_session_id,
+        query=q,
+        clip_type=type,
+    )
+    items = [ClipResponse.model_validate(clip) for clip in clips]
+    return APIResponse(
+        success=True,
+        message="Guest search results retrieved.",
+        data=ClipListResponse(
+            items=items,
+            total=len(items),
+            offset=0,
+            limit=len(items) or 1,
+        ),
+    )
+
+
+@router.patch(
+    "/clips/{clip_id}/pin",
+    response_model=APIResponse[ClipResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def toggle_guest_clip_pin(
+    clip_id: uuid.UUID,
+    x_guest_session_id: str = Header(...),
+) -> APIResponse[ClipResponse]:
+    """Toggle a guest clip's pin state and persist it in Redis."""
+    clip = await GuestService().toggle_guest_clip_pin(x_guest_session_id, clip_id)
+    return APIResponse(
+        success=True,
+        message="Guest clip pin state toggled.",
+        data=ClipResponse.model_validate(clip),
+    )
+
+
+@router.delete(
+    "/clips/{clip_id}",
+    response_model=APIResponse[None],
+    status_code=status.HTTP_200_OK,
+)
+async def delete_guest_clip(
+    clip_id: uuid.UUID,
+    x_guest_session_id: str = Header(...),
+) -> APIResponse[None]:
+    """Delete a guest clip from Redis."""
+    await GuestService().delete_guest_clip(x_guest_session_id, clip_id)
+    return APIResponse(
+        success=True,
+        message="Guest clip deleted.",
+        data=None,
     )
 
 

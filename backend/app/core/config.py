@@ -55,15 +55,15 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
 
     cors_origins_raw: str = Field(
-    default="http://localhost:5173,http://localhost:3000",
-    alias="CORS_ORIGINS",
-    description=(
-        "Comma-separated list of allowed CORS origins (no brackets/quotes "
-        "needed).  Defaults to Vite (5173) and CRA (3000) dev servers.  "
-        "Production MUST override via CORS_ORIGINS env var, e.g. "
-        "'https://nexusclip.app,https://www.nexusclip.app'."
-    ),
-)
+        default="http://localhost:5173,http://localhost:3000",
+        alias="CORS_ORIGINS",
+        description=(
+            "Comma-separated list of allowed CORS origins (no brackets/quotes "
+            "needed). Defaults to Vite (5173) and CRA (3000) dev servers. "
+            "Production MUST override via CORS_ORIGINS env var, e.g. "
+            "'https://nexusclip.app,https://www.nexusclip.app'."
+        ),
+    )
 
     @property
     def cors_origins(self) -> list[str]:
@@ -147,6 +147,16 @@ class Settings(BaseSettings):
         default=25,
         description="Maximum allowed upload file size in megabytes",
     )
+
+    # ------------------------------------------------------------------
+    # Object storage
+    # ------------------------------------------------------------------
+
+    r2_account_id: str | None = Field(default=None)
+    r2_access_key_id: str | None = Field(default=None)
+    r2_secret_access_key: str | None = Field(default=None)
+    r2_bucket_name: str | None = Field(default=None)
+    r2_public_url: str | None = Field(default=None)
 
     # ------------------------------------------------------------------
     # Helpers

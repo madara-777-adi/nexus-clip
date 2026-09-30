@@ -11,7 +11,7 @@
 - **Multi-Board Workspaces** — Organize clips into named boards per project or context
 - **Pinned Clips** — Pin important clips to exempt them from auto-cleanup
 - **Auto-Cleanup** — Configurable retention (7 / 30 / 90 days or never) for unpinned clips
-- **File Uploads** — Upload images and files, stored locally or on Cloudflare R2
+- **File Uploads** — Upload images and files, stored in Cloudflare R2 in production
 - **Full-text Search** — Search clips by title, content, filename, or tags
 - **Guest → Account Promotion** — Save your guest board into a permanent account at any time
 - **JWT Auth** — Secure email/password login with `HS256` JWT access tokens
@@ -90,7 +90,7 @@ Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and fill i
 | `JWT_SECRET_KEY` | ✅ | Random 64-byte secret. Generate: `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `REDIS_URL` | ✅ | Redis connection URL (`redis://localhost:6379/0`) |
 | `GOOGLE_CLIENT_ID` | optional | For Google OAuth login |
-| `R2_*` | optional | Cloudflare R2 file storage. Leave blank for local storage |
+| `R2_*` | required in production | Cloudflare R2 object storage credentials |
 
 ---
 

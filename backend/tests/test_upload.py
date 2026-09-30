@@ -3,6 +3,8 @@ import io
 import pytest
 from httpx import AsyncClient
 
+from app.core.exceptions import NotFoundError
+
 
 @pytest.mark.asyncio
 async def test_file_upload_allowed_extension(client: AsyncClient):
@@ -10,7 +12,11 @@ async def test_file_upload_allowed_extension(client: AsyncClient):
     file_content = b"console.log('Nexus Clip upload test');"
     files = {"file": ("test_script.js", io.BytesIO(file_content), "application/javascript")}
 
-    response = await client.post("/api/v1/upload", files=files)
+    response = await client.post(
+        "/api/v1/upload",
+        files=files,
+        headers={"x-guest-session-id": "guest-upload-test"},
+    )
     assert response.status_code == 201
     data = response.json()
     assert data["success"] is True
@@ -20,12 +26,35 @@ async def test_file_upload_allowed_extension(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_authorized_image_is_served_inline(client: AsyncClient):
+    file_content = b"\x89PNG\r\n\x1a\nimage-test"
+    files = {"file": ("preview.png", io.BytesIO(file_content), "image/png")}
+
+    upload_response = await client.post(
+        "/api/v1/upload",
+        files=files,
+        headers={"x-guest-session-id": "guest-upload-test"},
+    )
+    assert upload_response.status_code == 201
+    file_url = upload_response.json()["data"]["file_url"]
+
+    response = await client.get(f"/{file_url.lstrip('/')}")
+    assert response.status_code == 200
+    assert response.headers["content-disposition"].startswith("inline;")
+    assert response.content == file_content
+
+
+@pytest.mark.asyncio
 async def test_file_upload_blocked_html(client: AsyncClient):
     """HTML files are rejected with 400 ValidationError."""
     file_content = b"<html><script>alert(1)</script></html>"
     files = {"file": ("evil.html", io.BytesIO(file_content), "text/html")}
 
-    response = await client.post("/api/v1/upload", files=files)
+    response = await client.post(
+        "/api/v1/upload",
+        files=files,
+        headers={"x-guest-session-id": "guest-upload-test"},
+    )
     assert response.status_code == 400
     data = response.json()
     assert data["success"] is False
@@ -38,7 +67,11 @@ async def test_file_upload_blocked_svg(client: AsyncClient):
     file_content = b"<svg><script>alert(1)</script></svg>"
     files = {"file": ("evil.svg", io.BytesIO(file_content), "image/svg+xml")}
 
-    response = await client.post("/api/v1/upload", files=files)
+    response = await client.post(
+        "/api/v1/upload",
+        files=files,
+        headers={"x-guest-session-id": "guest-upload-test"},
+    )
     assert response.status_code == 400
     data = response.json()
     assert data["success"] is False
@@ -55,7 +88,11 @@ async def test_file_upload_too_large(client: AsyncClient, monkeypatch):
     file_content = b"x" * 1025  # 1 KB > 0 MB limit
     files = {"file": ("big.txt", io.BytesIO(file_content), "text/plain")}
 
-    response = await client.post("/api/v1/upload", files=files)
+    response = await client.post(
+        "/api/v1/upload",
+        files=files,
+        headers={"x-guest-session-id": "guest-upload-test"},
+    )
     assert response.status_code == 413
     data = response.json()
     assert data["success"] is False
@@ -90,8 +127,14 @@ async def test_delete_path_traversal(client: AsyncClient):
         from app.services.storage_service import StorageService
         service = StorageService()
         
-        # This shouldn't raise an exception (silent fail)
-        await service.delete_file(f"/static/uploads/{payload}")
+        # The access token must not authorize a path outside the upload root.
+        with pytest.raises(NotFoundError):
+            await service.delete_file(
+                f"/static/uploads/{payload}",
+                "invalid-path-token",
+                owner_id="guest-upload-test",
+                owner_type="guest",
+            )
         
         # ASSERT: The file outside UPLOAD_DIR was NOT deleted
         assert os.path.exists(dummy_path)
@@ -113,7 +156,24 @@ async def test_delete_legitimate_file(client: AsyncClient):
     
     assert file_path.exists()
     
-    response = await client.delete(f"/api/v1/upload/{filename}")
+    # The endpoint requires a token matching the file registry. This test
+    # exercises the service directly for a pre-existing local file.
+    from app.cache.redis import get_redis_client
+    import json
+    token = "legitimate-file-token"
+    redis = get_redis_client()
+    await redis.set(
+        f"file_access:{token}",
+        json.dumps({
+            "filename": filename,
+            "owner_id": "guest-upload-test",
+            "owner_type": "guest",
+        }),
+    )
+    response = await client.delete(
+        f"/api/v1/upload/{filename}?token={token}",
+        headers={"x-guest-session-id": "guest-upload-test"},
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True

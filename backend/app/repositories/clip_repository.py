@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import Text, cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.clip import Clip, ClipType
@@ -87,6 +87,7 @@ class ClipRepository(BaseRepository):
                     Clip.title.ilike(search_pattern),
                     Clip.content.ilike(search_pattern),
                     Clip.file_name.ilike(search_pattern),
+                    cast(Clip.tags, Text).ilike(search_pattern),
                 )
             )
 

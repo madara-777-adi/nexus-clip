@@ -261,6 +261,12 @@ Authentication
 
 Guest / Logged-in
 
+Authenticated clients use `/search`. Guest clients send an active
+`x-guest-session-id` header to `/guest/search`.
+
+Guest clients use `/guest/clips/{clipId}/pin` with their
+`x-guest-session-id` header.
+
 Request
 
 ```json
@@ -282,6 +288,9 @@ Update Clip.
 Authentication
 
 Guest / Logged-in
+
+Guest clients use `/guest/clips/{clipId}` with their
+`x-guest-session-id` header.
 
 ---
 
@@ -321,7 +330,8 @@ Upload File.
 
 Authentication
 
-Guest / Logged-in
+Required. Send a bearer token for a logged-in user or an active
+`x-guest-session-id` header for a guest session.
 
 Supported
 
@@ -335,7 +345,8 @@ Supported
 
 Returns
 
-File Metadata
+File Metadata, including a tokenized `file_url`. The returned URL must be
+used to access the private file.
 
 ---
 
@@ -347,7 +358,8 @@ Delete uploaded file.
 
 Authentication
 
-Owner only
+Owner only. Send the file access token as the `token` query parameter and
+the matching bearer token or guest session header.
 
 ---
 
@@ -379,6 +391,9 @@ Searches
 - Clip Content
 - File Name
 - Tags
+
+`GET /guest/search` supports `q` and `type` and searches the active guest
+session across title, content, filename, and tags.
 
 ---
 

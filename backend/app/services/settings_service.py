@@ -3,8 +3,10 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import NotFoundError, ValidationError
 from app.models.settings import UserSettings
 from app.models.user import User
+from app.repositories.board_repository import BoardRepository
 
 
 class SettingsService:
@@ -41,11 +43,20 @@ class SettingsService:
         """Update user settings."""
         settings = await self.get_user_settings(user)
 
-        if auto_cleanup_days is not None and auto_cleanup_days in ("7", "30", "90", "never"):
+        if auto_cleanup_days is not None:
+            if auto_cleanup_days not in ("7", "30", "90", "never"):
+                raise ValidationError(
+                    "Auto-cleanup must be one of: 7, 30, 90, or never."
+                )
             settings.auto_cleanup_days = auto_cleanup_days
         if theme is not None:
+            if theme not in ("dark", "light"):
+                raise ValidationError("Theme must be either dark or light.")
             settings.theme = theme
         if default_board_id is not None:
+            board = await BoardRepository(self.db).get_by_id(default_board_id, user.id)
+            if board is None:
+                raise NotFoundError(f"Board with ID '{default_board_id}' not found.")
             settings.default_board_id = default_board_id
 
         await self.db.commit()

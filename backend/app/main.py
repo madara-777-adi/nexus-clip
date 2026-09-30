@@ -1,11 +1,10 @@
 import mimetypes
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, Response
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -18,13 +17,11 @@ from app.db.init_db import create_tables, init_db
 from app.db.session import close_db_engine
 from app.middleware.rate_limit import limiter
 from app.schemas.response import ErrorResponse
+from app.services.storage_service import StorageService
 
 # Configure logging before acquiring logger instances
 configure_logging()
 logger = get_logger(__name__)
-
-UPLOAD_DIR = Path("/tmp/nexus_uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Maximum allowed request body size (defence in depth at the HTTP layer).
 # This is slightly larger than max_upload_size_mb to allow for multipart
@@ -112,23 +109,23 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Serve uploaded files as forced downloads to prevent inline script execution.
-    # Content-Disposition: attachment is set on every response regardless of file type,
-    # so an uploaded .html/.svg can never run as a script in this origin.
+    # Serve authorized raster images inline for previews; force-download every
+    # other supported file type so executable content is never rendered.
     @app.get("/static/uploads/{filename}")
-    async def serve_upload(filename: str) -> FileResponse:
-        """Force-download any uploaded file — never render inline."""
-        file_path = UPLOAD_DIR / filename
-        if not file_path.exists() or not file_path.is_file():
-            raise HTTPException(status_code=404, detail="File not found")
-        # Resolve the media type so the browser picks the right icon/app,
-        # but the attachment disposition still prevents inline rendering.
-        media_type, _ = mimetypes.guess_type(str(file_path))
-        return FileResponse(
-            path=str(file_path),
+    async def serve_upload(
+        filename: str,
+        token: str = Query(...),
+    ) -> Response:
+        """Serve an authorized upload with a safe disposition."""
+        storage = StorageService()
+        metadata = await storage.authorize_file(filename, token)
+        content, stored_filename = await storage.read_file(metadata)
+        media_type, _ = mimetypes.guess_type(stored_filename)
+        disposition = "inline" if media_type and media_type.startswith("image/") else "attachment"
+        return Response(
+            content=content,
             media_type=media_type or "application/octet-stream",
-            filename=filename,
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
         )
 
     # ── Exception Handlers ────────────────────────────────────────────

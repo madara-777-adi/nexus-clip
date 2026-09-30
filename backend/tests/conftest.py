@@ -35,6 +35,9 @@ class MockRedis:
     async def setex(self, name: str, time: int, value: str):
         self.store[name] = value.encode("utf-8") if isinstance(value, str) else value
 
+    async def set(self, name: str, value: str):
+        self.store[name] = value.encode("utf-8") if isinstance(value, str) else value
+
     async def delete(self, *names: str):
         for name in names:
             self.store.pop(name, None)
@@ -75,6 +78,9 @@ async def client(db_session: AsyncSession, monkeypatch) -> AsyncGenerator[AsyncC
 
     monkeypatch.setattr("app.cache.redis.get_redis_client", _mock_get_redis)
     monkeypatch.setattr("app.services.guest_service.get_redis_client", _mock_get_redis)
+    monkeypatch.setattr("app.services.storage_service.get_redis_client", _mock_get_redis)
+    mock_redis_instance.store.clear()
+    await mock_redis_instance.set("guest_session:guest-upload-test", "{}")
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:

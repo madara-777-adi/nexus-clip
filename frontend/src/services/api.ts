@@ -121,6 +121,29 @@ class ApiClient {
     return res.data;
   }
 
+  async searchGuest(query: string, type?: ClipType): Promise<Clip[]> {
+    const params = new URLSearchParams();
+    if (query) params.append('q', query);
+    if (type) params.append('type', type);
+    const res = await this.request<{ items: Clip[]; total: number }>(
+      `/guest/search?${params.toString()}`,
+    );
+    return res.data.items;
+  }
+
+  async toggleGuestPin(clipId: string): Promise<Clip> {
+    const res = await this.request<Clip>(`/guest/clips/${clipId}/pin`, {
+      method: 'PATCH',
+    });
+    return res.data;
+  }
+
+  async deleteGuestClip(clipId: string): Promise<void> {
+    await this.request<null>(`/guest/clips/${clipId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async promoteGuestBoard(): Promise<{ board_id: string; board_name: string; moved_clips_count: number }> {
     const res = await this.request<{ board_id: string; board_name: string; moved_clips_count: number }>('/guest/promote', {
       method: 'POST',

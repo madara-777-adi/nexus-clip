@@ -86,7 +86,22 @@ export const BoardProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const fetchClips = useCallback(async () => {
     if (isGuestMode) {
-      await fetchGuestBoard();
+      setLoading(true);
+      try {
+        if (searchQuery.trim() || filterType !== 'all') {
+          const results = await api.searchGuest(
+            searchQuery,
+            filterType === 'all' ? undefined : filterType,
+          );
+          setClips(results);
+        } else {
+          await fetchGuestBoard();
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Failed to search guest clips');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
     if (!activeBoardId) return;
@@ -178,9 +193,8 @@ export const BoardProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const togglePin = async (clipId: string) => {
     if (isGuestMode) {
-      setClips((prev) =>
-        prev.map((c) => (c.id === clipId ? { ...c, is_pinned: !c.is_pinned } : c))
-      );
+      await api.toggleGuestPin(clipId);
+      await fetchGuestBoard();
       showToast('Pin state updated.');
     } else {
       await api.togglePin(clipId);
@@ -191,7 +205,8 @@ export const BoardProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deleteClip = async (clipId: string) => {
     if (isGuestMode) {
-      setClips((prev) => prev.filter((c) => c.id !== clipId));
+      await api.deleteGuestClip(clipId);
+      await fetchGuestBoard();
       showToast('Clip removed.');
     } else {
       await api.deleteClip(clipId);

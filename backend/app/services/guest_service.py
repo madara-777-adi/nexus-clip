@@ -30,6 +30,17 @@ class GuestService:
         suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
         return f"NEXUS-{suffix}"
 
+    async def _get_existing_session(self, guest_session_id: str) -> tuple[Any, dict[str, Any]]:
+        redis = get_redis_client()
+        if redis is None:
+            raise InternalServerError("Redis is currently unavailable.")
+        key = f"guest_session:{guest_session_id}"
+        raw = await redis.get(key)
+        if not raw:
+            raise NotFoundError("Guest session not found or expired.")
+        data = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+        return redis, json.loads(data)
+
     async def get_or_create_session(
         self,
         guest_session_id: str | None = None,
@@ -136,6 +147,70 @@ class GuestService:
 
         session_id_str = session_id.decode("utf-8") if isinstance(session_id, bytes) else session_id
         return await self.get_or_create_session(session_id_str)
+
+    async def search_guest_clips(
+        self,
+        guest_session_id: str,
+        query: str | None = None,
+        clip_type: ClipType | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search clips in an active guest session."""
+        _redis, session = await self._get_existing_session(guest_session_id)
+        normalized_query = query.strip().casefold() if query else None
+        matches: list[dict[str, Any]] = []
+        for clip in session.get("clips", []):
+            if clip_type is not None and clip.get("type") != clip_type.value:
+                continue
+            if normalized_query:
+                searchable = " ".join(
+                    [
+                        clip.get("title") or "",
+                        clip.get("content") or "",
+                        clip.get("file_name") or "",
+                        " ".join(clip.get("tags") or []),
+                    ]
+                ).casefold()
+                if normalized_query not in searchable:
+                    continue
+            matches.append(clip)
+        return matches
+
+    async def toggle_guest_clip_pin(
+        self,
+        guest_session_id: str,
+        clip_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        """Toggle a clip's pin state and persist the guest session in Redis."""
+        redis, session = await self._get_existing_session(guest_session_id)
+        for clip in session.get("clips", []):
+            if clip.get("id") == str(clip_id):
+                clip["is_pinned"] = not clip.get("is_pinned", False)
+                clip["updated_at"] = datetime.now(UTC).isoformat()
+                await redis.setex(
+                    f"guest_session:{guest_session_id}",
+                    GUEST_BOARD_TTL_SECONDS,
+                    json.dumps(session),
+                )
+                return clip
+        raise NotFoundError(f"Guest clip with ID '{clip_id}' not found.")
+
+    async def delete_guest_clip(
+        self,
+        guest_session_id: str,
+        clip_id: uuid.UUID,
+    ) -> None:
+        """Delete a clip and persist the guest session in Redis."""
+        redis, session = await self._get_existing_session(guest_session_id)
+        clips = session.get("clips", [])
+        remaining = [clip for clip in clips if clip.get("id") != str(clip_id)]
+        if len(remaining) == len(clips):
+            raise NotFoundError(f"Guest clip with ID '{clip_id}' not found.")
+        session["clips"] = remaining
+        await redis.setex(
+            f"guest_session:{guest_session_id}",
+            GUEST_BOARD_TTL_SECONDS,
+            json.dumps(session),
+        )
 
     async def promote_guest_board(
         self,

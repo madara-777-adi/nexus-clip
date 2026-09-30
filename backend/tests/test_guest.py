@@ -73,6 +73,78 @@ async def test_guest_session_and_clip_flow(client: AsyncClient):
     assert p_data["moved_clips_count"] == 1
 
 
+@pytest.mark.asyncio
+async def test_guest_pin_and_delete_persist_in_session(client: AsyncClient):
+    session = (await client.post("/api/v1/guest/board")).json()["data"]
+    session_id = session["guest_session_id"]
+    clip = (
+        await client.post(
+            "/api/v1/guest/board/clips",
+            headers={"x-guest-session-id": session_id},
+            json={"type": "text", "title": "Persistent", "content": "value"},
+        )
+    ).json()["data"]
+
+    pin_response = await client.patch(
+        f"/api/v1/guest/clips/{clip['id']}/pin",
+        headers={"x-guest-session-id": session_id},
+    )
+    assert pin_response.status_code == 200
+    assert pin_response.json()["data"]["is_pinned"] is True
+
+    refreshed = (
+        await client.post(
+            "/api/v1/guest/board",
+            headers={"x-guest-session-id": session_id},
+        )
+    ).json()["data"]
+    assert refreshed["clips"][0]["is_pinned"] is True
+
+    delete_response = await client.delete(
+        f"/api/v1/guest/clips/{clip['id']}",
+        headers={"x-guest-session-id": session_id},
+    )
+    assert delete_response.status_code == 200
+    refreshed = (
+        await client.post(
+            "/api/v1/guest/board",
+            headers={"x-guest-session-id": session_id},
+        )
+    ).json()["data"]
+    assert refreshed["clips"] == []
+
+
+@pytest.mark.asyncio
+async def test_guest_search_filters_content_tags_and_type(client: AsyncClient):
+    session = (await client.post("/api/v1/guest/board")).json()["data"]
+    session_id = session["guest_session_id"]
+    headers = {"x-guest-session-id": session_id}
+    await client.post(
+        "/api/v1/guest/board/clips",
+        headers=headers,
+        json={
+            "type": "code",
+            "title": "Deploy helper",
+            "content": "rotate token",
+            "tags": ["release"],
+        },
+    )
+    await client.post(
+        "/api/v1/guest/board/clips",
+        headers=headers,
+        json={"type": "text", "title": "Unrelated", "content": "notes"},
+    )
+
+    response = await client.get(
+        "/api/v1/guest/search?q=release&type=code",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["total"] == 1
+    assert data["items"][0]["title"] == "Deploy helper"
+
+
 def test_board_code_entropy_uniqueness():
     """Ensure generating 1000 board codes yields no duplicates (basic sanity check on k=8 entropy)."""
     from app.services.guest_service import GuestService
